@@ -147,6 +147,7 @@ export async function generateConsultationReportPdf(
   row("Sexe", consultation.sexe ? (SEXE_LABELS[consultation.sexe] ?? consultation.sexe) : "—");
   row("Statut matrimonial", consultation.statutMatrimonial ? (STATUT_LABELS[consultation.statutMatrimonial] ?? consultation.statutMatrimonial) : "—");
   row("Âge", val(consultation.age));
+  row("Date de naissance", consultation.dateNaissance ? consultation.dateNaissance.toLocaleDateString("fr-FR") : "—");
   row("Ville", val(consultation.ville));
   row("Profession", val(consultation.profession));
   row("Téléphone", val(consultation.telephoneContact ?? patientFallback?.telephone));

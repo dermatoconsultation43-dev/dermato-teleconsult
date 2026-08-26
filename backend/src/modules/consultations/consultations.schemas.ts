@@ -28,6 +28,7 @@ export const consultationDraftSchema = z.object({
   sexe: z.nativeEnum(Sexe).optional(),
   statutMatrimonial: z.nativeEnum(StatutMatrimonial).optional(),
   age: z.number().int().min(0).max(120).optional(),
+  dateNaissance: z.coerce.date().optional(),
   ville: z.string().trim().max(150).optional(),
   profession: z.string().trim().max(150).optional(),
   telephoneContact: z.string().trim().regex(phoneRegex, "Numéro de téléphone invalide.").optional(),

@@ -66,6 +66,8 @@ export interface ConsultationDraft {
   sexe?: Sexe;
   statutMatrimonial?: StatutMatrimonial;
   age?: number;
+  /** Format ISO (YYYY-MM-DD) — le backend la reçoit en chaîne et la convertit en Date. */
+  dateNaissance?: string;
   ville?: string;
   profession?: string;
   telephoneContact?: string;

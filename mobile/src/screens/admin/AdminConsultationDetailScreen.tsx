@@ -296,6 +296,7 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
         <InfoRow label="Sexe" value={consultation.sexe ? SEXE_LABELS[consultation.sexe] : undefined} />
         <InfoRow label="Statut matrimonial" value={consultation.statutMatrimonial ? STATUT_LABELS[consultation.statutMatrimonial] : undefined} />
         <InfoRow label="Âge" value={consultation.age ? `${consultation.age} ans` : undefined} />
+        <InfoRow label="Date de naissance" value={consultation.dateNaissance} />
         <InfoRow label="Ville" value={consultation.ville} />
         <InfoRow label="Profession" value={consultation.profession} />
         <InfoRow

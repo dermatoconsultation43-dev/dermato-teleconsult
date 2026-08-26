@@ -11,6 +11,24 @@ import { CONSULTATION_TOTAL_STEPS, type ConsultationStackParamList } from "../..
 
 type Props = NativeStackScreenProps<ConsultationStackParamList, "Step1PersonalInfo">;
 
+// Pas de date-picker natif installé dans l'app — champ texte au format français
+// habituel, converti en ISO (attendu par le backend, voir consultationDraftSchema)
+// seulement une fois la saisie complète, pour ne pas gêner la frappe.
+const FR_DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+
+function frDateToIso(text: string): string | undefined {
+  const match = FR_DATE_RE.exec(text.trim());
+  if (!match) return undefined;
+  const [, day, month, year] = match;
+  return `${year}-${month}-${day}`;
+}
+
+function isoDateToFr(iso: string | undefined): string {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-");
+  return day && month && year ? `${day}/${month}/${year}` : "";
+}
+
 const STATUT_OPTIONS = [
   { value: "celibataire", label: "Célibataire" },
   { value: "marie", label: "Marié(e)" },
@@ -25,6 +43,12 @@ export function Step1PersonalInfo({ navigation }: Props) {
   const updateDraft = useConsultationDraftStore((s) => s.updateDraft);
   const { saveAndContinue, saving, error } = useSaveDraftStep();
   const [localError, setLocalError] = useState<string | null>(null);
+  const [dateNaissanceText, setDateNaissanceText] = useState(() => isoDateToFr(draft.dateNaissance));
+
+  function handleDateNaissanceChange(text: string) {
+    setDateNaissanceText(text);
+    updateDraft({ dateNaissance: frDateToIso(text) });
+  }
 
   const canContinue = Boolean(
     draft.nomComplet && draft.sexe && draft.age && draft.telephoneContact && draft.confirmationWhatsapp !== undefined,
@@ -82,6 +106,12 @@ export function Step1PersonalInfo({ navigation }: Props) {
         onChangeText={(v) => updateDraft({ age: v ? Number(v.replace(/[^0-9]/g, "")) : undefined })}
         keyboardType="number-pad"
         style={{ marginTop: spacing.xl }}
+      />
+      <TextField
+        label="Date de naissance (JJ/MM/AAAA)"
+        value={dateNaissanceText}
+        onChangeText={handleDateNaissanceChange}
+        keyboardType="number-pad"
       />
       <TextField label="Ville de résidence" value={draft.ville ?? ""} onChangeText={(v) => updateDraft({ ville: v })} />
       <TextField label="Profession" value={draft.profession ?? ""} onChangeText={(v) => updateDraft({ profession: v })} />

@@ -147,6 +147,7 @@ model Consultation {
   sexe                Sexe?
   statutMatrimonial   StatutMatrimonial?  @map("statut_matrimonial")
   age                 Int?
+  dateNaissance       DateTime? @map("date_naissance") @db.Date
   ville               String?
   profession          String?
   telephoneContact    String?  @map("telephone_contact")

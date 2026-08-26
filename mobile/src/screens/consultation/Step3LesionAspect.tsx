@@ -27,7 +27,9 @@ const LESION_IMAGES: Record<string, ReturnType<typeof require>> = {
   pustule: require("../../assets/lesions/pustule.jpg"),
   vesicule: require("../../assets/lesions/vesicule.jpg"),
   bulle: require("../../assets/lesions/bulle.jpg"),
-  plaie: require("../../assets/lesions/plaie.jpg"),
+  // Pas d'image pour "plaie" : la photo de référence (plaie ouverte) a choqué des
+  // patients — l'option reste sélectionnable via son libellé/description seuls
+  // (ChoiceGroup gère nativement une option sans image, voir gallery variant).
 };
 
 // Mode aperçu dev (voir LoginScreen) : copie locale du référentiel de
@@ -76,10 +78,6 @@ export function Step3LesionAspect({ navigation }: Props) {
   }
 
   function handleContinue() {
-    if (selectedCodes.length === 0) {
-      setLocalError("Sélectionnez au moins un aspect.");
-      return;
-    }
     setLocalError(null);
     saveAndContinue(() => navigation.navigate("Step4Context"));
   }
@@ -92,7 +90,7 @@ export function Step3LesionAspect({ navigation }: Props) {
       subtitle="Vous pouvez sélectionner plusieurs réponses."
       onBack={() => navigation.goBack()}
       onContinue={handleContinue}
-      canContinue={selectedCodes.length > 0}
+      canContinue
       saving={saving}
       error={localError ?? error}
     >
@@ -126,6 +124,13 @@ export function Step3LesionAspect({ navigation }: Props) {
         Où se situent les lésions ?
       </Text>
       <BodyMap selected={draft.lesionZones ?? []} onChange={(zones) => updateDraft({ lesionZones: zones })} />
+
+      <TextField
+        label="Où les lésions sont-elles apparues en premier ?"
+        value={draft.localisationPremieresLesions ?? ""}
+        onChangeText={(v) => updateDraft({ localisationPremieresLesions: v })}
+        style={{ marginTop: spacing.xl }}
+      />
 
       <Text style={[typography.label, { color: colors.text, marginTop: spacing.xxl, marginBottom: spacing.sm }]}>
         Y a-t-il d'autres lésions, d'un aspect différent, ailleurs sur le corps ?
