@@ -58,21 +58,25 @@ export async function createOrUpdateWalkInDraft(adminId: string, clientUuid: str
       });
     }
   } else {
-    if (!input.nomComplet || !input.telephoneContact) {
-      throw new ValidationError("Nom complet et numéro de téléphone sont requis pour créer un dossier.");
+    if (!input.nomComplet) {
+      throw new ValidationError("Le nom complet est requis pour créer un dossier.");
     }
     const { prenom, nom } = splitFullName(input.nomComplet);
 
+    // Le numéro est facultatif sur le terrain (pas toujours disponible/connu) —
+    // la déduplication par numéro ne s'applique donc que s'il est renseigné.
     // Ce numéro est peut-être déjà celui d'un patient terrain saisi lors d'une
     // précédente visite (ou d'un téléphone partagé en famille) — on réutilise
     // alors sa fiche plutôt que de percuter la contrainte unique sur
     // patients.telephone. S'il appartient à un compte inscrit (firebaseUid non
     // nul), c'est un vrai conflit : l'agent ne doit jamais créer de dossier à la
     // place d'un patient qui a son propre compte.
-    const existingByPhone = await prisma.patient.findFirst({
-      where: { telephone: input.telephoneContact, deletedAt: null },
-      select: { id: true, firebaseUid: true },
-    });
+    const existingByPhone = input.telephoneContact
+      ? await prisma.patient.findFirst({
+          where: { telephone: input.telephoneContact, deletedAt: null },
+          select: { id: true, firebaseUid: true },
+        })
+      : null;
 
     if (existingByPhone) {
       if (existingByPhone.firebaseUid !== null) {
@@ -91,7 +95,7 @@ export async function createOrUpdateWalkInDraft(adminId: string, clientUuid: str
           firebaseUid: null,
           nom,
           prenom,
-          telephone: input.telephoneContact,
+          telephone: input.telephoneContact ?? null,
           email: input.emailContact ?? null,
           createdByAdminId: adminId,
         },

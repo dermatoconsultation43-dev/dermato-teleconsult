@@ -36,7 +36,7 @@ export function AdminConsultationsListScreen({ navigation, route }: Props) {
   const [filter, setFilter] = useState<ConsultationStatus | "all">(route.params?.initialFilter ?? "all");
   const [search, setSearch] = useState("");
 
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery({
+  const { data, isLoading, isError, error, refetch, isRefetching } = useQuery({
     queryKey: ["admin", "consultations", filter, search],
     queryFn: () => listAdminConsultations({ status: filter === "all" ? undefined : filter, search: search || undefined }),
     enabled: !isDevPreview,
@@ -45,6 +45,25 @@ export function AdminConsultationsListScreen({ navigation, route }: Props) {
   const items = isDevPreview
     ? listMockAdminConsultations(filter === "all" ? undefined : filter, search || undefined)
     : (data?.items ?? []);
+
+  const getErrorMessage = () => {
+    if (!error) return "Une erreur est survenue lors du chargement des dossiers.";
+    
+    const err = error as any;
+    if (err.message?.includes("network") || err.message?.includes("fetch")) {
+      return "Erreur réseau. Vérifiez votre connexion internet.";
+    }
+    if (err.status === 401 || err.status === 403) {
+      return "Vous n'avez pas l'accès pour voir les dossiers.";
+    }
+    if (err.status === 404) {
+      return "Aucun dossier trouvé.";
+    }
+    if (err.message) {
+      return `Erreur : ${err.message}`;
+    }
+    return "Impossible de charger les dossiers. Veuillez réessayer.";
+  };
 
   function renderItem({ item }: { item: AdminConsultationListItem }) {
     return (
@@ -118,7 +137,7 @@ export function AdminConsultationsListScreen({ navigation, route }: Props) {
           <ActivityIndicator color={colors.accent} />
         ) : isError ? (
           <Card>
-            <Text style={[typography.body, { color: colors.text }]}>Impossible de charger les dossiers.</Text>
+            <Text style={[typography.body, { color: colors.text }]}>{getErrorMessage()}</Text>
             <View style={{ marginTop: spacing.md }}>
               <Button label="Réessayer" variant="secondary" onPress={() => refetch()} />
             </View>

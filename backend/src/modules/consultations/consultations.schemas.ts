@@ -1,8 +1,6 @@
 import { z } from "zod";
 import { ConsultationStatus, Demangeaison, DureeUnite, EntourageStatus, Sexe, StatutMatrimonial } from "@prisma/client";
 
-const phoneRegex = /^\+?[0-9 ]{8,20}$/;
-
 const lesionTypeSelectionSchema = z.object({
   // Volontairement une chaîne libre, pas un z.nativeEnum : lesion_types est un
   // référentiel éditable en base, pas une énumération figée dans le code. La
@@ -31,8 +29,8 @@ export const consultationDraftSchema = z.object({
   dateNaissance: z.coerce.date().optional(),
   ville: z.string().trim().max(150).optional(),
   profession: z.string().trim().max(150).optional(),
-  telephoneContact: z.string().trim().regex(phoneRegex, "Numéro de téléphone invalide.").optional(),
-  emailContact: z.string().trim().toLowerCase().email().optional(),
+  telephoneContact: z.string().trim().min(1).max(30).optional(),
+  emailContact: z.string().trim().toLowerCase().email("Adresse email invalide.").optional(),
   confirmationWhatsapp: z.boolean().optional(),
   poidsKg: z.number().positive().max(400).optional(),
   tailleCm: z.number().positive().max(272).optional(),

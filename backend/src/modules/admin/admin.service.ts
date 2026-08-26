@@ -1,6 +1,8 @@
 import { ConsultationStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "../../db/client.js";
 import { ConflictError, NotFoundError, ValidationError } from "../../lib/errors.js";
+import { logger } from "../../lib/logger.js";
 import { streamPhotoFromDrive } from "../../services/googleDrive.js";
 import { updateConsultationStatusInSheet } from "../../services/googleSheets.js";
 import type { ConsultationDraftInput } from "../consultations/consultations.schemas.js";
@@ -21,8 +23,9 @@ export async function listAdminConsultations(options: {
   cursor?: string;
   limit: number;
 }) {
-  return prisma.consultation.findMany({
+  const items = await prisma.consultation.findMany({
     where: {
+      deletedAt: null,
       status: options.status,
       // Cherche à la fois sur l'identité du dossier (nomComplet, saisie à
       // l'étape 1 — la personne réellement consultée) et sur le compte
@@ -51,6 +54,31 @@ export async function listAdminConsultations(options: {
     take: options.limit,
     ...(options.cursor ? { skip: 1, cursor: { id: options.cursor } } : {}),
   });
+
+  return attachAdminUnreadCounts(items);
+}
+
+// Nombre de messages patient reçus depuis la dernière lecture admin, par dossier
+// (voir Message dans schema.prisma). Une requête `count` par dossier plutôt
+// qu'un `_count` Prisma imbriqué : ce dernier ne peut pas filtrer sur
+// `createdAt > adminLastReadMessagesAt` (valeur qui varie par ligne) en une
+// seule requête — acceptable ici vu le faible nombre de dossiers par page (max
+// 100, voir listAdminConsultationsQuerySchema).
+async function attachAdminUnreadCounts<T extends { id: string; adminLastReadMessagesAt: Date | null }>(
+  items: T[],
+): Promise<(T & { unreadMessagesCount: number })[]> {
+  const counts = await Promise.all(
+    items.map((item) =>
+      prisma.message.count({
+        where: {
+          consultationId: item.id,
+          senderType: "patient",
+          createdAt: { gt: item.adminLastReadMessagesAt ?? new Date(0) },
+        },
+      }),
+    ),
+  );
+  return items.map((item, i) => ({ ...item, unreadMessagesCount: counts[i] }));
 }
 
 // Compteurs pour l'accueil admin (participants inscrits, dossiers en attente/
@@ -73,8 +101,9 @@ export async function getAdminStats() {
 
 export async function getAdminConsultationDetail(id: string) {
   const consultation = await prisma.consultation.findUnique({ where: { id }, include: detailInclude });
-  if (!consultation) throw new NotFoundError("Consultation introuvable.");
-  return consultation;
+  if (!consultation || consultation.deletedAt) throw new NotFoundError("Consultation introuvable.");
+  const [withCount] = await attachAdminUnreadCounts([consultation]);
+  return withCount;
 }
 
 // Correction d'un dossier déjà soumis (ex. faute de frappe repérée parmi 200
@@ -155,6 +184,35 @@ export async function getAdminPhotoStream(consultationId: string, photoId: strin
   return streamPhotoFromDrive(photo.driveFileId);
 }
 
+// Pas de restriction de statut côté admin (contrairement à messages.service.ts
+// côté patient, qui bloque tant que le dossier est en brouillon) : un dossier
+// admin existe forcément déjà, donc le fil est toujours consultable.
+export async function listAdminMessages(consultationId: string) {
+  const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
+  if (!consultation) throw new NotFoundError("Consultation introuvable.");
+
+  const messages = await prisma.message.findMany({
+    where: { consultationId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  await prisma.consultation.update({
+    where: { id: consultationId },
+    data: { adminLastReadMessagesAt: new Date() },
+  });
+
+  return messages;
+}
+
+export async function sendAdminMessage(adminId: string, consultationId: string, body: string) {
+  const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
+  if (!consultation) throw new NotFoundError("Consultation introuvable.");
+
+  return prisma.message.create({
+    data: { consultationId, senderType: "admin", senderAdminId: adminId, body },
+  });
+}
+
 // Machine à états explicite : toute transition non listée est refusée. Ça empêche
 // par exemple de faire passer un dossier "terminé" directement à "confirmée", ou de
 // réutiliser une route de statut pour contourner le flux métier.
@@ -166,6 +224,33 @@ export const ALLOWED_TRANSITIONS: Record<ConsultationStatus, ConsultationStatus[
   completed: [],
   cancelled: [],
 };
+
+// Le libellé posté comme message "system" est la seule notification que le
+// patient reçoit d'un changement de statut (pas de push, voir ADMIN_FIXES.md) —
+// donc toujours inclure de quoi agir (créneau, motif) plutôt qu'une simple
+// mention du nouveau statut.
+function buildStatusChangeMessage(
+  newStatus: ConsultationStatus,
+  updated: Prisma.ConsultationGetPayload<{ include: typeof detailInclude }>,
+  reason: string | undefined,
+): string | null {
+  switch (newStatus) {
+    case ConsultationStatus.confirmed: {
+      const when = updated.appointment?.scheduledAt
+        ? new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short" }).format(updated.appointment.scheduledAt)
+        : updated.appointment?.availability?.label;
+      return `Votre rendez-vous a été confirmé${when ? ` : ${when}` : ""}.`;
+    }
+    case ConsultationStatus.seen:
+      return "Votre dossier a été consulté par le dermatologue.";
+    case ConsultationStatus.completed:
+      return "Votre téléconsultation est terminée. Merci de votre confiance.";
+    case ConsultationStatus.cancelled:
+      return `Votre rendez-vous a été annulé.${reason ? ` Motif : ${reason}` : ""}`;
+    default:
+      return null;
+  }
+}
 
 export async function changeConsultationStatus(
   adminId: string,
@@ -235,5 +320,101 @@ export async function changeConsultationStatus(
   // doit jamais faire échouer un changement de statut déjà acquis en base.
   await updateConsultationStatusInSheet(consultationId, input.newStatus);
 
-  return updated;
+  // Même principe : le message "system" annonçant le changement (seule
+  // notification du patient, voir buildStatusChangeMessage) ne doit jamais faire
+  // échouer une transition déjà acquise en base si son insertion rate.
+  const systemMessageBody = buildStatusChangeMessage(input.newStatus, updated, input.reason);
+  if (systemMessageBody) {
+    try {
+      await prisma.message.create({
+        data: { consultationId, senderType: "system", body: systemMessageBody },
+      });
+    } catch (error) {
+      logger.error({ error }, "Échec de la création du message système de changement de statut.");
+    }
+  }
+
+  const [withCount] = await attachAdminUnreadCounts([updated]);
+  return withCount;
+}
+
+// Suppression logicielle d'un dossier : marque deletedAt pour archivage
+// (sans vraiment effacer les données). Seul un dossier confirmé, vu ou complété
+// peut être supprimé (pas un brouillon ou un dossier en attente).
+export async function deleteConsultation(consultationId: string, reason: string) {
+  const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
+  if (!consultation) throw new NotFoundError("Consultation introuvable.");
+
+  // Empêcher la suppression d'un dossier en brouillon ou en attente
+  if (consultation.status === ConsultationStatus.draft || consultation.status === ConsultationStatus.pending) {
+    throw new ConflictError(
+      `Impossible de supprimer un dossier au statut "${consultation.status}". ` +
+      `Changez d'abord le statut à confirmée, vue ou terminée.`,
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    // Marquer le dossier comme supprimé
+    await tx.consultation.update({
+      where: { id: consultationId },
+      data: { deletedAt: new Date() },
+    });
+
+    // Créer une entrée dans l'historique de statut
+    await tx.statusHistory.create({
+      data: {
+        consultationId,
+        previousStatus: consultation.status,
+        newStatus: consultation.status, // Statut inchangé, mais marqué comme supprimé
+        changedByType: "admin",
+        reason: `Suppression : ${reason}`,
+      },
+    });
+
+    return tx.consultation.findUniqueOrThrow({ where: { id: consultationId }, include: detailInclude });
+  });
+}
+
+// Modification d'un rendez-vous confirmé : change le créneau ou la date/heure
+// manuelle, ou ajoute/modifie les notes. N'est possible que si le dossier est
+// au statut "confirmé".
+export async function updateAppointment(
+  consultationId: string,
+  input: { availabilityId?: string; scheduledAt?: Date; notes?: string },
+  adminId: string,
+) {
+  const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
+  if (!consultation) throw new NotFoundError("Consultation introuvable.");
+
+  if (consultation.status !== ConsultationStatus.confirmed) {
+    throw new ConflictError(
+      `Impossible de modifier le rendez-vous d'un dossier au statut "${consultation.status}". ` +
+      `Seuls les dossiers confirmés peuvent être modifiés.`,
+    );
+  }
+
+  if (!input.availabilityId && !input.scheduledAt && input.notes === undefined) {
+    throw new ValidationError("Indiquez un créneau (availabilityId ou scheduledAt) ou des notes pour modifier le rendez-vous.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const appointment = await tx.appointment.findUnique({ where: { consultationId } });
+    if (!appointment) {
+      throw new NotFoundError("Rendez-vous introuvable pour cette consultation.");
+    }
+
+    // Un rendez-vous est soit sur un créneau prédéfini, soit sur une date manuelle,
+    // jamais les deux : en basculer un remplace l'autre plutôt que de le laisser
+    // traîner (ex. capacité de créneau qui compterait à tort une place comme prise).
+    return tx.appointment.update({
+      where: { consultationId },
+      data: {
+        ...(input.availabilityId ? { availabilityId: input.availabilityId, scheduledAt: null } : {}),
+        ...(input.scheduledAt ? { scheduledAt: input.scheduledAt, availabilityId: null } : {}),
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        createdByAdminId: adminId,
+      },
+      include: { availability: true, createdByAdmin: { select: { nom: true, prenom: true } } },
+    });
+  });
 }

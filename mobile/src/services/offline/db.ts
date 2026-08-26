@@ -16,11 +16,21 @@ export function getDb(): string {
       `CREATE TABLE IF NOT EXISTS draft_queue (
         client_uuid TEXT PRIMARY KEY,
         payload TEXT NOT NULL,
+        mode TEXT NOT NULL DEFAULT 'patient',
         status TEXT NOT NULL,
         last_error TEXT,
         updated_at TEXT NOT NULL
       );`,
     );
+    // Migration pour les installs existantes (table déjà créée avant l'ajout de la
+    // colonne mode) : sans elle, un brouillon en file ne savait plus s'il venait
+    // d'un patient ou d'un agent terrain après un redémarrage de l'app — voir
+    // syncEngine.ts, qui rejouait tout par défaut sur le point d'accès "patient".
+    try {
+      QuickSQLite.execute(DB_NAME, `ALTER TABLE draft_queue ADD COLUMN mode TEXT NOT NULL DEFAULT 'patient';`);
+    } catch {
+      // Colonne déjà présente (install récente créée directement avec le CREATE TABLE ci-dessus).
+    }
     // consultation_id est NULL tant que le brouillon associé n'a pas encore
     // synchronisé (voir photoQueue.ts#setPhotoConsultationId, appelé par
     // syncEngine dès qu'un brouillon obtient son id serveur) — une photo prise

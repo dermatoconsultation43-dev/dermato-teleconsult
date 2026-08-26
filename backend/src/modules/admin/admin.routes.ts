@@ -5,16 +5,23 @@ import { validate } from "../../middleware/validate.js";
 import {
   changeStatusSchema,
   consultationIdParamsSchema,
+  deleteConsultationSchema,
   listAdminConsultationsQuerySchema,
   photoIdParamsSchema,
+  updateAppointmentSchema,
 } from "./admin.schemas.js";
 import { consultationDraftSchema } from "../consultations/consultations.schemas.js";
+import { sendMessageBodySchema } from "../messages/messages.schemas.js";
 import {
   changeConsultationStatus,
+  deleteConsultation,
   getAdminConsultationDetail,
   getAdminPhotoStream,
   getAdminStats,
   listAdminConsultations,
+  listAdminMessages,
+  sendAdminMessage,
+  updateAppointment,
   updateConsultationFields,
 } from "./admin.service.js";
 
@@ -73,6 +80,32 @@ adminRouter.get(
   },
 );
 
+adminRouter.get(
+  "/consultations/:id/messages",
+  validate({ params: consultationIdParamsSchema }),
+  async (req, res, next) => {
+    try {
+      const messages = await listAdminMessages(req.params.id);
+      res.json({ items: messages });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+adminRouter.post(
+  "/consultations/:id/messages",
+  validate({ params: consultationIdParamsSchema, body: sendMessageBodySchema }),
+  async (req, res, next) => {
+    try {
+      const message = await sendAdminMessage(req.auth!.admin!.id, req.params.id, req.body.body);
+      res.status(201).json(message);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
 adminRouter.patch(
   "/consultations/:id/fields",
   validate({ params: consultationIdParamsSchema, body: consultationDraftSchema }),
@@ -93,6 +126,32 @@ adminRouter.patch(
     try {
       const consultation = await changeConsultationStatus(req.auth!.admin!.id, req.params.id, req.body);
       res.json(consultation);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+adminRouter.delete(
+  "/consultations/:id",
+  validate({ params: consultationIdParamsSchema, body: deleteConsultationSchema }),
+  async (req, res, next) => {
+    try {
+      const consultation = await deleteConsultation(req.params.id, req.body.reason);
+      res.json({ success: true, consultation });
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+adminRouter.patch(
+  "/consultations/:id/appointment",
+  validate({ params: consultationIdParamsSchema, body: updateAppointmentSchema }),
+  async (req, res, next) => {
+    try {
+      const appointment = await updateAppointment(req.params.id, req.body, req.auth!.admin!.id);
+      res.json(appointment);
     } catch (error) {
       next(error);
     }

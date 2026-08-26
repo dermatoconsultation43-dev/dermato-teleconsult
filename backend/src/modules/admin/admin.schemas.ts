@@ -19,3 +19,13 @@ export const changeStatusSchema = z.object({
   scheduledAt: z.coerce.date().optional(),
   notes: z.string().trim().max(1000).optional(),
 });
+
+export const deleteConsultationSchema = z.object({
+  reason: z.string().trim().max(1000),
+});
+
+export const updateAppointmentSchema = z.object({
+  availabilityId: z.string().uuid().optional(),
+  scheduledAt: z.coerce.date().optional(),
+  notes: z.string().trim().max(1000).optional(),
+});

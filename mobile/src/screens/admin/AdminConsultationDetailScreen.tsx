@@ -11,8 +11,8 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { BODY_ZONE_LABELS } from "../../components/BodyMap";
 import { useTheme } from "../../theme/useTheme";
 import { useAuthStore } from "../../store/authStore";
-import { adminPhotoViewPath, changeConsultationStatus, getAdminConsultationDetail } from "../../services/api/admin";
-import { getPhotoViewRequest } from "../../services/api/photos";
+import { adminPhotoViewPath, changeConsultationStatus, deleteConsultation, getAdminConsultationDetail, updateAppointment } from "../../services/api/admin";
+import { getPhotoDataUri } from "../../services/api/photos";
 import { getMockAdminConsultationDetail, updateMockConsultationStatus } from "../../services/devPreview/adminMock";
 import { ApiError } from "../../services/api/client";
 import type { AdminStackParamList } from "../../navigation/adminTypes";
@@ -98,10 +98,18 @@ function PhotoRow({
   mockSource?: ImageSourcePropType;
 }) {
   const { colors, spacing, radius, typography } = useTheme();
-  const [source, setSource] = useState<{ uri: string; headers: Record<string, string> } | null>(null);
+  // Data URI (pas { uri, headers } sur une URL distante) : avec la New
+  // Architecture (newArchEnabled=true, voir android/gradle.properties), les
+  // en-têtes passés à <Image> ne sont pas fiablement transmis au chargeur natif
+  // sur Android — la requête part sans Authorization, le backend répond 401 en
+  // JSON, et l'image échoue silencieusement au décodage (constaté en pratique,
+  // systématique sur toutes les photos). On récupère donc les octets en JS
+  // (en-tête fiable, comme le reste de l'API) et on les passe déjà décodés.
+  const [source, setSource] = useState<string | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   async function reveal() {
     if (mockSource) {
@@ -110,9 +118,10 @@ function PhotoRow({
     }
     setLoading(true);
     setError(null);
+    setImageError(false);
     try {
-      const result = await getPhotoViewRequest(adminPhotoViewPath(consultationId, photo.id));
-      setSource(result);
+      const dataUri = await getPhotoDataUri(adminPhotoViewPath(consultationId, photo.id));
+      setSource(dataUri);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Impossible de charger la photo.");
     } finally {
@@ -131,12 +140,27 @@ function PhotoRow({
           style={{ width: "100%", height: 240, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
           resizeMode="cover"
         />
-      ) : source ? (
+      ) : source && !imageError ? (
         <Image
-          source={source}
+          source={{ uri: source }}
           style={{ width: "100%", height: 240, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
           resizeMode="cover"
+          onError={() => setImageError(true)}
         />
+      ) : imageError ? (
+        <View>
+          <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.xs }]}>
+            Échec de l'affichage de la photo.
+          </Text>
+          <Button
+            label="Réessayer"
+            variant="secondary"
+            onPress={() => {
+              setSource(null);
+              reveal();
+            }}
+          />
+        </View>
       ) : photo.status !== "uploaded" ? (
         <Text style={[typography.bodyMuted, { color: colors.textMuted }]}>Photo non disponible ({photo.status}).</Text>
       ) : (
@@ -154,7 +178,7 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
   const isDevPreview = useAuthStore((s) => s.admin?.id === "dev-preview-admin");
   const [, forceMockRerender] = useState(0);
 
-  const [actionMode, setActionMode] = useState<"confirm" | "cancel" | null>(null);
+  const [actionMode, setActionMode] = useState<"confirm" | "cancel" | "edit-appointment" | "delete" | null>(null);
   const [selectedAvailabilityId, setSelectedAvailabilityId] = useState<string | null>(null);
   const [scheduledAtText, setScheduledAtText] = useState("");
   const [notes, setNotes] = useState("");
@@ -196,6 +220,37 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
     },
   });
 
+  const updateAppointmentMutation = useMutation({
+    mutationFn: (input: Parameters<typeof updateAppointment>[1]) =>
+      updateAppointment(id, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "consultation", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "consultations"] });
+      setActionMode(null);
+      setSelectedAvailabilityId(null);
+      setScheduledAtText("");
+      setNotes("");
+      setActionError(null);
+    },
+    onError: (err) => {
+      setActionError(err instanceof ApiError ? err.message : "Une erreur est survenue lors de la modification.");
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (reason: string) =>
+      deleteConsultation(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "consultations"] });
+      Alert.alert("Succès", "Dossier supprimé avec succès.", [
+        { text: "OK", onPress: () => navigation.goBack() },
+      ]);
+    },
+    onError: (err) => {
+      setActionError(err instanceof ApiError ? err.message : "Une erreur est survenue lors de la suppression.");
+    },
+  });
+
   function handleDirectTransition(newStatus: ConsultationStatus, confirmLabel: string) {
     Alert.alert("Confirmer", confirmLabel, [
       { text: "Annuler", style: "cancel" },
@@ -229,6 +284,45 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
   function handleCancelSubmit() {
     setActionError(null);
     mutation.mutate({ newStatus: "cancelled", reason: reason.trim() || undefined });
+  }
+
+  function handleEditAppointmentSubmit() {
+    if (!selectedAvailabilityId && !scheduledAtText.trim()) {
+      setActionError("Sélectionnez un créneau ou indiquez une date/heure précise.");
+      return;
+    }
+    let scheduledAt: string | undefined;
+    if (scheduledAtText.trim()) {
+      const parsed = parseFlexibleDate(scheduledAtText);
+      if (!parsed) {
+        setActionError("Date invalide. Exemple : 25/08/2026 19:30");
+        return;
+      }
+      scheduledAt = parsed.toISOString();
+    }
+    setActionError(null);
+    updateAppointmentMutation.mutate({
+      availabilityId: selectedAvailabilityId ?? undefined,
+      scheduledAt,
+      notes: notes.trim() || undefined,
+    });
+  }
+
+  function handleDeleteSubmit() {
+    Alert.alert(
+      "Confirmer la suppression",
+      "Cette action ne peut pas être annulée. Êtes-vous sûr de vouloir supprimer ce dossier ?",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Supprimer",
+          style: "destructive",
+          onPress: () => {
+            deleteMutation.mutate(reason.trim() || "Suppression par l'administrateur");
+          },
+        },
+      ],
+    );
   }
 
   if (isLoading) {
@@ -273,12 +367,16 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
       </View>
 
       {!isDevPreview ? (
-        <View style={{ marginTop: spacing.md }}>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }}>
           <Button
-            label="Modifier les informations"
+            label={
+              consultation.unreadMessagesCount > 0
+                ? `Voir les messages (${consultation.unreadMessagesCount})`
+                : "Voir les messages"
+            }
             variant="secondary"
             fullWidth={false}
-            onPress={() => navigation.navigate("AdminEditConsultation", { id: consultation.id })}
+            onPress={() => navigation.navigate("AdminConsultationChat", { id: consultation.id })}
           />
         </View>
       ) : null}
@@ -423,7 +521,7 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
         </Card>
       ) : null}
 
-      {allowed.length > 0 ? (
+      {allowed.length > 0 || consultation.status === "confirmed" ? (
         <Card style={{ marginTop: spacing.lg, marginBottom: spacing.xxl }}>
           <Text style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>Actions</Text>
 
@@ -465,10 +563,61 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
                 <Button label="Retour" variant="ghost" onPress={() => setActionMode(null)} />
               </View>
             </View>
+          ) : actionMode === "edit-appointment" ? (
+            <View>
+              {availabilityOptions.length > 0 ? (
+                <>
+                  <Text style={[typography.label, { color: colors.text, marginBottom: spacing.sm }]}>Choisir un créneau</Text>
+                  <ChoiceGroup
+                    options={availabilityOptions}
+                    selected={selectedAvailabilityId ? [selectedAvailabilityId] : []}
+                    onChange={([v]) => setSelectedAvailabilityId(v)}
+                  />
+                </>
+              ) : null}
+              <TextField
+                label="Date/heure précise (optionnel, ex : 25/08/2026 19:30)"
+                value={scheduledAtText}
+                onChangeText={setScheduledAtText}
+                style={{ marginTop: spacing.lg }}
+              />
+              <TextField label="Notes (optionnel)" value={notes} onChangeText={setNotes} />
+              {actionError ? (
+                <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.md }]}>{actionError}</Text>
+              ) : null}
+              <Button label="Modifier le rendez-vous" loading={updateAppointmentMutation.isPending} onPress={handleEditAppointmentSubmit} />
+              <View style={{ marginTop: spacing.sm }}>
+                <Button label="Annuler" variant="ghost" onPress={() => setActionMode(null)} />
+              </View>
+            </View>
+          ) : actionMode === "delete" ? (
+            <View>
+              <TextField label="Motif de la suppression (optionnel)" value={reason} onChangeText={setReason} />
+              {actionError ? (
+                <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.md }]}>{actionError}</Text>
+              ) : null}
+              <Button
+                label="Confirmer la suppression"
+                loading={deleteMutation.isPending}
+                onPress={handleDeleteSubmit}
+                style={{ backgroundColor: colors.danger }}
+              />
+              <View style={{ marginTop: spacing.sm }}>
+                <Button label="Annuler" variant="ghost" onPress={() => setActionMode(null)} />
+              </View>
+            </View>
           ) : (
             <View style={{ gap: spacing.sm }}>
               {allowed.includes("confirmed") ? (
                 <Button label="Confirmer le rendez-vous" onPress={() => setActionMode("confirm")} />
+              ) : null}
+              {consultation.status === "confirmed" ? (
+                <Button label="Modifier le rendez-vous" onPress={() => {
+                  setSelectedAvailabilityId(consultation.appointment?.availability?.id ?? null);
+                  setScheduledAtText(consultation.appointment?.scheduledAt ? new Date(consultation.appointment.scheduledAt).toLocaleString("fr-FR") : "");
+                  setNotes(consultation.appointment?.notes ?? "");
+                  setActionMode("edit-appointment");
+                }} />
               ) : null}
               {allowed.includes("seen") ? (
                 <Button
@@ -484,6 +633,17 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
               ) : null}
               {allowed.includes("cancelled") ? (
                 <Button label="Annuler le dossier" variant="secondary" onPress={() => setActionMode("cancel")} />
+              ) : null}
+              {consultation.status !== "draft" && consultation.status !== "pending" ? (
+                <Button
+                  label="Supprimer le dossier"
+                  variant="secondary"
+                  onPress={() => {
+                    setReason("");
+                    setActionMode("delete");
+                  }}
+                  style={{ borderColor: colors.danger }}
+                />
               ) : null}
             </View>
           )}

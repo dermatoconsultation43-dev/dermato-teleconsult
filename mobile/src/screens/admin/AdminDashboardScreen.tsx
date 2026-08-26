@@ -64,13 +64,6 @@ function initialsFromFullName(name: string): string {
   return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
-// Ce service (liste des participants distincts) n'a pas d'endpoint dédié — plutôt
-// que de fabriquer un faux écran, on l'annonce honnêtement comme à venir (même
-// logique que les tuiles "Services" de l'accueil patient, voir DashboardScreen).
-function notifyComingSoon(label: string) {
-  Alert.alert(label, "Cette fonctionnalité arrive prochainement.");
-}
-
 export function AdminDashboardScreen({ navigation }: Props) {
   const { colors, spacing, radius, typography } = useTheme();
   const admin = useAuthStore((s) => s.admin);
@@ -133,9 +126,7 @@ export function AdminDashboardScreen({ navigation }: Props) {
   ];
 
   const quickActions: { icon: IconName; label: string; onPress: () => void }[] = [
-    { icon: "users", label: "Participants", onPress: () => notifyComingSoon("Participants") },
     { icon: "folder", label: "Dossiers", onPress: () => navigation.navigate("AdminConsultationsList", { initialFilter: "all" }) },
-    { icon: "calendar", label: "Agenda", onPress: () => notifyComingSoon("Agenda") },
     { icon: "plus", label: "Nouveau", onPress: () => navigation.navigate("AgentFlow") },
   ];
 
@@ -419,21 +410,9 @@ export function AdminDashboardScreen({ navigation }: Props) {
           <Icon name="home" size={20} color={colors.accentStrong} />
           <Text style={[typography.caption, { color: colors.accentStrong, fontWeight: "700", marginTop: 2 }]}>Accueil</Text>
         </View>
-        <Pressable style={styles.tabItem} onPress={() => notifyComingSoon("Participants")}>
-          <Icon name="users" size={20} color={colors.textMuted} />
-          <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>Participants</Text>
-        </Pressable>
-        <Pressable style={styles.tabItem} onPress={() => notifyComingSoon("Consultations")}>
-          <Icon name="calendar" size={20} color={colors.textMuted} />
-          <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>Consultations</Text>
-        </Pressable>
         <Pressable style={styles.tabItem} onPress={() => navigation.navigate("AdminConsultationsList", { initialFilter: "all" })}>
           <Icon name="folder" size={20} color={colors.textMuted} />
           <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>Dossiers</Text>
-        </Pressable>
-        <Pressable style={styles.tabItem} onPress={() => notifyComingSoon("Agenda")}>
-          <Icon name="clock" size={20} color={colors.textMuted} />
-          <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>Agenda</Text>
         </Pressable>
       </View>
     </SafeAreaView>

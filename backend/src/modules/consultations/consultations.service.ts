@@ -7,8 +7,6 @@ import { buildReportFileName, generateConsultationReportPdf, uploadReportPdfToDr
 import { logger } from "../../lib/logger.js";
 import type { ConsultationDraftInput } from "./consultations.schemas.js";
 
-const REQUIRED_PHOTO_SLOTS = ["vue_generale", "vue_rapprochee"] as const;
-
 const consultationInclude = {
   lesionTypes: { include: { lesionType: true } },
   availabilities: { include: { availability: true } },
@@ -100,7 +98,7 @@ export async function upsertDraft(patientId: string, clientUuid: string, input: 
 
 export async function getConsultation(patientId: string, id: string) {
   const consultation = await prisma.consultation.findUnique({ where: { id }, include: consultationInclude });
-  if (!consultation) throw new NotFoundError("Consultation introuvable.");
+  if (!consultation || consultation.deletedAt) throw new NotFoundError("Consultation introuvable.");
   if (consultation.patientId !== patientId) throw new ForbiddenError();
   return consultation;
 }
@@ -110,12 +108,30 @@ export async function listConsultations(
   options: { status?: ConsultationStatus; cursor?: string; limit: number },
 ) {
   const items = await prisma.consultation.findMany({
-    where: { patientId, status: options.status },
+    where: { patientId, status: options.status, deletedAt: null },
     orderBy: { createdAt: "desc" },
     take: options.limit,
     ...(options.cursor ? { skip: 1, cursor: { id: options.cursor } } : {}),
   });
-  return items;
+
+  // Une requête `count` par dossier plutôt qu'un `_count` Prisma imbriqué :
+  // celui-ci ne peut pas filtrer sur `createdAt > patientLastReadMessagesAt`
+  // (valeur qui varie par ligne) en une seule requête — acceptable ici vu le
+  // faible nombre de dossiers par patient (voir admin.service.ts pour la même
+  // logique côté admin, avec le même arbitrage).
+  const unreadCounts = await Promise.all(
+    items.map((item) =>
+      prisma.message.count({
+        where: {
+          consultationId: item.id,
+          senderType: { not: "patient" },
+          createdAt: { gt: item.patientLastReadMessagesAt ?? new Date(0) },
+        },
+      }),
+    ),
+  );
+
+  return items.map((item, i) => ({ ...item, unreadMessagesCount: unreadCounts[i] }));
 }
 
 // Le consentement ne peut être enregistré tant que le dossier n'est pas déjà un
@@ -148,7 +164,6 @@ const REQUIRED_DRAFT_FIELDS: Array<{ field: keyof ConsultationDraftInput; label:
   { field: "confirmationWhatsapp", label: "Confirmation par WhatsApp" },
   { field: "motif", label: "Motif de consultation" },
   { field: "demangeaison", label: "Démangeaisons" },
-  { field: "photosQualiteConfirmee", label: "Confirmation de la qualité des photos" },
 ];
 
 // Transition draft -> pending. Tout ce qui est requis pour qu'un dermatologue
@@ -175,10 +190,13 @@ export async function submitConsultation(patientId: string, id: string) {
     );
   }
 
-  const uploadedSlots = new Set(consultation.photos.filter((p) => p.status === "uploaded").map((p) => p.slot));
-  const missingPhotoSlots = REQUIRED_PHOTO_SLOTS.filter((slot) => !uploadedSlots.has(slot));
-  if (missingPhotoSlots.length > 0) {
-    throw new ValidationError(`Photo(s) manquante(s) : ${missingPhotoSlots.join(", ")}`);
+  // Un problème de peau peut n'avoir aucune lésion visible à photographier — les
+  // photos ne sont donc plus obligatoires pour soumettre le dossier. S'il y en a
+  // au moins une, la confirmation de qualité reste requise (elle porte sur les
+  // photos réellement fournies, pas sur leur absence).
+  const hasAnyPhoto = consultation.photos.some((p) => p.status === "uploaded");
+  if (hasAnyPhoto && consultation.photosQualiteConfirmee === null) {
+    throw new ValidationError("Champs requis manquants avant l'envoi : Confirmation de la qualité des photos");
   }
 
   if (!consultation.consent) {
@@ -217,7 +235,9 @@ export async function submitConsultation(patientId: string, id: string) {
     select: { prenom: true, nom: true, telephone: true, email: true },
   });
   if (patient) {
-    await notifyConsultationSubmitted(patient.telephone, updated.refNumber);
+    if (patient.telephone) {
+      await notifyConsultationSubmitted(patient.telephone, updated.refNumber);
+    }
     await appendConsultationRow({
       id: updated.id,
       nom: updated.nomComplet ?? `${patient.prenom} ${patient.nom}`.trim(),

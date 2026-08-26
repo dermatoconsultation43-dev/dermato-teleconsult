@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { useTheme } from "../theme/useTheme";
 
 type Variant = "primary" | "secondary" | "ghost";
@@ -12,12 +12,15 @@ interface ButtonProps {
   disabled?: boolean;
   fullWidth?: boolean;
   testID?: string;
+  /** Surcharge ponctuelle (ex. rouge pour une action destructrice) — appliquée
+   * après les styles du variant, jamais à leur place. */
+  style?: StyleProp<ViewStyle>;
 }
 
 // Zone tactile confortable (>=48dp de hauteur) et état loading intégré pour éviter
 // les doubles soumissions accidentelles — le bouton se désactive lui-même pendant
 // l'appel réseau plutôt que de compter sur chaque écran pour le refaire.
-export function Button({ label, onPress, variant = "primary", loading, disabled, fullWidth = true, testID }: ButtonProps) {
+export function Button({ label, onPress, variant = "primary", loading, disabled, fullWidth = true, testID, style }: ButtonProps) {
   const { colors, spacing, radius, typography } = useTheme();
   const isDisabled = disabled || loading;
   const scale = useRef(new Animated.Value(1)).current;
@@ -64,6 +67,7 @@ export function Button({ label, onPress, variant = "primary", loading, disabled,
             shadowOffset: { width: 0, height: 3 },
             elevation: variant === "primary" && !isDisabled ? 3 : 0,
           },
+          style,
         ]}
       >
         <View style={styles.content}>

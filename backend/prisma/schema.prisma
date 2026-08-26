@@ -100,7 +100,7 @@ model Patient {
   firebaseUid      String?   @unique @map("firebase_uid")
   nom              String
   prenom           String
-  telephone        String
+  telephone        String?
   email            String?
   createdByAdminId String?   @map("created_by_admin_id") @db.Uuid
   createdByAdmin   AdminUser? @relation(fields: [createdByAdminId], references: [id])
@@ -110,6 +110,7 @@ model Patient {
 
   consultations Consultation[]
   statusChanges StatusHistory[] @relation("PatientStatusChanges")
+  messages      Message[]       @relation("PatientMessages")
 
   @@map("patients")
 }
@@ -127,6 +128,7 @@ model AdminUser {
 
   appointmentsCreated Appointment[]
   statusChanges       StatusHistory[] @relation("AdminStatusChanges")
+  messages            Message[]       @relation("AdminMessages")
   walkInPatients      Patient[]
 
   @@map("admin_users")
@@ -205,12 +207,19 @@ model Consultation {
   updatedAt   DateTime  @updatedAt @map("updated_at")
   deletedAt   DateTime? @map("deleted_at")
 
+  // Marqueurs de lecture du fil de discussion (voir Message ci-dessous) : un
+  // simple horodatage par côté suffit à calculer un compteur de non-lus (pas de
+  // table de statut de lecture par message, inutile ici — un seul fil par dossier).
+  patientLastReadMessagesAt DateTime? @map("patient_last_read_messages_at")
+  adminLastReadMessagesAt   DateTime? @map("admin_last_read_messages_at")
+
   lesionTypes    ConsultationLesionType[]
   availabilities ConsultationAvailability[]
   photos         Photo[]
   consent        Consent?
   appointment    Appointment?
   statusHistory  StatusHistory[]
+  messages       Message[]
 
   @@index([patientId])
   @@index([status])
@@ -345,4 +354,28 @@ model StatusHistory {
   @@index([consultationId])
   @@index([createdAt])
   @@map("status_history")
+}
+
+// ---------- Messagerie ----------
+
+// Un seul fil par dossier, entre le patient et l'équipe admin/dermato. Sert
+// aussi de flux de notification : chaque transition de statut (confirmé, vu,
+// terminé, annulé — voir admin.service.ts#changeConsultationStatus) y poste un
+// message senderType="system", donc le patient voit l'annonce ET peut répondre
+// dans le même fil, sans mécanisme de notification séparé.
+model Message {
+  id              String        @id @default(uuid()) @db.Uuid
+  consultationId  String        @map("consultation_id") @db.Uuid
+  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  senderType      ChangedByType @map("sender_type")
+  senderPatientId String?       @map("sender_patient_id") @db.Uuid
+  senderPatient   Patient?      @relation("PatientMessages", fields: [senderPatientId], references: [id])
+  senderAdminId   String?       @map("sender_admin_id") @db.Uuid
+  senderAdmin     AdminUser?    @relation("AdminMessages", fields: [senderAdminId], references: [id])
+  body            String
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([consultationId])
+  @@index([createdAt])
+  @@map("messages")
 }

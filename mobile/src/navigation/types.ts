@@ -11,6 +11,8 @@ export type RootStackParamList = {
   SignUp: undefined;
   PatientDashboard: undefined;
   NewConsultation: undefined;
+  MessagesList: undefined;
+  ConsultationChat: { consultationId: string };
   AdminDashboard: undefined;
 };
 

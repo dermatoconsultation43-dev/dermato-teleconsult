@@ -59,6 +59,7 @@ export interface ConsultationSummary {
   motif: string | null;
   submittedAt: string | null;
   createdAt: string;
+  unreadMessagesCount: number;
 }
 
 export interface ConsultationDraft {
@@ -133,6 +134,7 @@ export interface AdminConsultationListItem {
   nomComplet: string | null;
   telephoneContact: string | null;
   patient: { nom: string; prenom: string; telephone: string };
+  unreadMessagesCount: number;
 }
 
 export interface StatusHistoryEntry {
@@ -150,6 +152,7 @@ export type AdminConsultationDetail = Omit<ConsultationDraft, "lesionTypes" | "a
   status: ConsultationStatus;
   submittedAt: string | null;
   createdAt: string;
+  unreadMessagesCount: number;
   patient: { id: string; nom: string; prenom: string; telephone: string; email: string };
   lesionTypes: Array<{ lesionCode: string; precision: string | null; lesionType: LesionType }>;
   availabilities: Array<{ id: string; autrePrecision: string | null; availability: Availability | null }>;
@@ -164,6 +167,17 @@ export type AdminConsultationDetail = Omit<ConsultationDraft, "lesionTypes" | "a
   } | null;
   statusHistory: StatusHistoryEntry[];
 };
+
+// Un seul fil par dossier — voir Message dans backend/prisma/schema.prisma.
+// "system" = message automatique posté par le backend à chaque changement de
+// statut (confirmé/vu/terminé/annulé), c'est la notification du patient.
+export interface Message {
+  id: string;
+  consultationId: string;
+  senderType: "patient" | "admin" | "system";
+  body: string;
+  createdAt: string;
+}
 
 export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };

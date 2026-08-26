@@ -7,6 +7,56 @@ import { useOfflineStore } from "../../store/offlineStore";
 import { useIsDevPreview } from "../../hooks/useIsDevPreview";
 import { countPendingDrafts, saveDraftLocally } from "../../services/offline/draftQueue";
 
+// Traduit les noms de champs du schéma backend (voir consultations.schemas.ts)
+// en libellés lisibles, pour transformer le détail zod (`error.details.fieldErrors`)
+// en message exploitable — le message générique du serveur ("Corps de requête
+// invalide.") ne dit jamais quel champ poser problème.
+const FIELD_LABELS: Record<string, string> = {
+  nomComplet: "Nom complet",
+  sexe: "Sexe",
+  statutMatrimonial: "Statut matrimonial",
+  age: "Âge",
+  dateNaissance: "Date de naissance",
+  ville: "Ville",
+  profession: "Profession",
+  telephoneContact: "Numéro de téléphone",
+  emailContact: "Adresse email",
+  confirmationWhatsapp: "Confirmation par WhatsApp",
+  poidsKg: "Poids",
+  tailleCm: "Taille",
+  temperatureC: "Température",
+  motif: "Motif de consultation",
+  conseilCosmetiqueDemande: "Conseil cosmétique demandé",
+  conseilCosmetiquePrecision: "Précision conseil cosmétique",
+  dureeValeur: "Durée",
+  dureeUnite: "Unité de durée",
+  localisationPremieresLesions: "Localisation des premières lésions",
+  demangeaison: "Démangeaisons",
+  lesionZones: "Zones du corps touchées",
+  autresLesions: "Autres lésions",
+  autresLesionsAspect: "Aspect des autres lésions",
+  autresLesionsLocalisation: "Localisation des autres lésions",
+  zonesSensiblesAtteintes: "Zones sensibles atteintes",
+  zonesSensiblesPrecision: "Précision zones sensibles",
+  entourageStatus: "Cas similaires dans l'entourage",
+  entouragePrecision: "Précision entourage",
+  produitsUtilises: "Produits utilisés",
+  produitsPrecision: "Précision produits",
+  antecedentsMedicaux: "Antécédents médicaux",
+  antecedentsPrecision: "Précision antécédents",
+  notesComplementaires: "Notes complémentaires",
+  photosQualiteConfirmee: "Confirmation qualité des photos",
+};
+
+function formatValidationDetails(details: unknown): string | null {
+  if (!details || typeof details !== "object") return null;
+  const fieldErrors = (details as { fieldErrors?: Record<string, string[]> }).fieldErrors;
+  if (!fieldErrors) return null;
+  const entries = Object.entries(fieldErrors).filter(([, msgs]) => msgs && msgs.length > 0);
+  if (entries.length === 0) return null;
+  return entries.map(([field, msgs]) => `${FIELD_LABELS[field] ?? field} : ${msgs[0]}`).join("\n");
+}
+
 // Appelé au "Continuer" de chaque étape : sauvegarde tout le brouillon (pas
 // seulement le champ de l'étape courante). Si le réseau répond (même avec une
 // erreur métier), on bloque et on affiche l'erreur — mais si l'appel échoue
@@ -48,12 +98,14 @@ export function useSaveDraftStep() {
       onSuccess();
     } catch (err) {
       if (err instanceof ApiError && err.status === 0) {
-        saveDraftLocally(clientUuid, draft);
+        saveDraftLocally(clientUuid, draft, mode);
         setDraftStatus(clientUuid, "pending");
         setPendingCount(countPendingDrafts());
         onSuccess();
+      } else if (err instanceof ApiError) {
+        setError(formatValidationDetails(err.details) ?? err.message);
       } else {
-        setError(err instanceof ApiError ? err.message : "Une erreur est survenue. Réessayez.");
+        setError("Une erreur est survenue. Réessayez.");
       }
     } finally {
       setSaving(false);

@@ -1,12 +1,14 @@
 import { QuickSQLite } from "react-native-quick-sqlite";
 import { getDb } from "./db";
 import type { ConsultationDraft } from "../../types/api";
+import type { ConsultationMode } from "../../store/consultationDraftStore";
 
 export type DraftSyncStatus = "pending" | "syncing" | "synced" | "failed";
 
 export interface DraftQueueRow {
   clientUuid: string;
   payload: ConsultationDraft;
+  mode: ConsultationMode;
   status: DraftSyncStatus;
   lastError: string | null;
   updatedAt: string;
@@ -15,15 +17,18 @@ export interface DraftQueueRow {
 // Un seul brouillon en file par clientUuid : on écrase le snapshot précédent
 // plutôt que d'empiler chaque étape, car le backend rejoue toujours l'état
 // complet du formulaire (voir le commentaire sur upsertDraft côté backend) —
-// inutile de conserver l'historique intermédiaire en local.
-export function saveDraftLocally(clientUuid: string, draft: ConsultationDraft): void {
+// inutile de conserver l'historique intermédiaire en local. Le mode est stocké
+// ici comme dans les autres files (photo/consent/submit) : sans lui, le rejeu
+// après un redémarrage de l'app (formulaire en mémoire réinitialisé) ne sait
+// plus si ce brouillon vient d'un patient ou d'un agent terrain.
+export function saveDraftLocally(clientUuid: string, draft: ConsultationDraft, mode: ConsultationMode): void {
   const db = getDb();
   QuickSQLite.execute(
     db,
-    `INSERT INTO draft_queue (client_uuid, payload, status, last_error, updated_at)
-     VALUES (?, ?, 'pending', NULL, ?)
-     ON CONFLICT(client_uuid) DO UPDATE SET payload = excluded.payload, status = 'pending', last_error = NULL, updated_at = excluded.updated_at;`,
-    [clientUuid, JSON.stringify(draft), new Date().toISOString()],
+    `INSERT INTO draft_queue (client_uuid, payload, mode, status, last_error, updated_at)
+     VALUES (?, ?, ?, 'pending', NULL, ?)
+     ON CONFLICT(client_uuid) DO UPDATE SET payload = excluded.payload, mode = excluded.mode, status = 'pending', last_error = NULL, updated_at = excluded.updated_at;`,
+    [clientUuid, JSON.stringify(draft), mode, new Date().toISOString()],
   );
 }
 
@@ -48,12 +53,13 @@ export function getPendingDrafts(): DraftQueueRow[] {
   const db = getDb();
   const result = QuickSQLite.execute(
     db,
-    `SELECT client_uuid, payload, status, last_error, updated_at FROM draft_queue WHERE status IN ('pending', 'failed');`,
+    `SELECT client_uuid, payload, mode, status, last_error, updated_at FROM draft_queue WHERE status IN ('pending', 'failed');`,
   );
   const rows = result.rows?._array ?? [];
   return rows.map((row: Record<string, string>) => ({
     clientUuid: row.client_uuid,
     payload: JSON.parse(row.payload) as ConsultationDraft,
+    mode: (row.mode as ConsultationMode) ?? "patient",
     status: row.status as DraftSyncStatus,
     lastError: row.last_error,
     updatedAt: row.updated_at,

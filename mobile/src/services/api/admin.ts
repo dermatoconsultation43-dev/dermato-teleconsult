@@ -5,6 +5,7 @@ import type {
   AdminProfile,
   ConsultationDraft,
   ConsultationStatus,
+  Message,
 } from "../../types/api";
 
 export function getMyAdminProfile() {
@@ -36,11 +37,11 @@ export function getAdminStats() {
 }
 
 export function listAdminConsultations(params: { status?: ConsultationStatus; search?: string; limit?: number } = {}) {
-  const query = new URLSearchParams();
-  if (params.status) query.set("status", params.status);
-  if (params.search) query.set("search", params.search);
-  if (params.limit) query.set("limit", String(params.limit));
-  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const queryParts: string[] = [];
+  if (params.status) queryParts.push(`status=${encodeURIComponent(params.status)}`);
+  if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+  if (params.limit) queryParts.push(`limit=${String(params.limit)}`);
+  const suffix = queryParts.length > 0 ? `?${queryParts.join("&")}` : "";
   return apiRequest<{ items: AdminConsultationListItem[] }>(`/admin/consultations${suffix}`);
 }
 
@@ -64,6 +65,16 @@ export function adminPhotoViewPath(consultationId: string, photoId: string): str
   return `/admin/consultations/${consultationId}/photos/${photoId}/view`;
 }
 
+// Ouvrir le fil marque déjà les messages comme lus côté backend (voir
+// admin.service.ts#listAdminMessages) — pas d'appel "marquer comme lu" séparé.
+export function adminListMessages(consultationId: string) {
+  return apiRequest<{ items: Message[] }>(`/admin/consultations/${consultationId}/messages`);
+}
+
+export function adminSendMessage(consultationId: string, body: string) {
+  return apiRequest<Message>(`/admin/consultations/${consultationId}/messages`, { method: "POST", body: { body } });
+}
+
 export interface ChangeStatusInput {
   newStatus: ConsultationStatus;
   reason?: string;
@@ -74,4 +85,27 @@ export interface ChangeStatusInput {
 
 export function changeConsultationStatus(id: string, input: ChangeStatusInput) {
   return apiRequest<AdminConsultationDetail>(`/admin/consultations/${id}/status`, { method: "PATCH", body: input });
+}
+
+// Suppression logicielle d'un dossier (marque deletedAt)
+export function deleteConsultation(id: string, reason: string) {
+  return apiRequest<{ success: boolean; consultation: AdminConsultationDetail }>(`/admin/consultations/${id}`, {
+    method: "DELETE",
+    body: { reason },
+  });
+}
+
+// Modification d'un rendez-vous confirmé : change le créneau, la date/heure
+// manuelle ou les notes.
+export interface UpdateAppointmentInput {
+  availabilityId?: string;
+  scheduledAt?: string;
+  notes?: string;
+}
+
+export function updateAppointment(id: string, input: UpdateAppointmentInput) {
+  return apiRequest<{ id: string; consultationId: string; availabilityId?: string; scheduledAt?: string; notes?: string }>(
+    `/admin/consultations/${id}/appointment`,
+    { method: "PATCH", body: input },
+  );
 }

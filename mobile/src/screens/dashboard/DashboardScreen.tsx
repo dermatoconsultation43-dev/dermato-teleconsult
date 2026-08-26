@@ -28,8 +28,7 @@ import type { RootStackParamList } from "../../navigation/types";
 
 type Props = NativeStackScreenProps<RootStackParamList, "PatientDashboard">;
 
-const SERVICES: { label: string; subtitle: string; icon: IconName }[] = [
-  { label: "Mes messages", subtitle: "Discutez avec le dermatologue", icon: "message" },
+const OTHER_SERVICES: { label: string; subtitle: string; icon: IconName }[] = [
   { label: "Mes ordonnances", subtitle: "Retrouvez vos ordonnances", icon: "document" },
   { label: "Mes rendez-vous", subtitle: "Gérez vos rendez-vous", icon: "calendar" },
   { label: "Mon profil", subtitle: "Gérez vos informations", icon: "user" },
@@ -63,6 +62,10 @@ export function DashboardScreen({ navigation }: Props) {
   });
 
   const consultations = data?.items ?? [];
+  // Déjà chargé par le useQuery ci-dessus (aucun appel réseau supplémentaire) —
+  // sert à la fois au badge sur la cloche et au point rouge de la tuile "Mes
+  // messages" (voir messages.service.ts côté backend pour le calcul par dossier).
+  const unreadMessagesTotal = consultations.reduce((sum: number, item: ConsultationSummary) => sum + item.unreadMessagesCount, 0);
   const initial = (patient?.prenom?.[0] ?? "?").toUpperCase();
   const tipCardWidth = width - spacing.xxl * 2;
 
@@ -72,7 +75,9 @@ export function DashboardScreen({ navigation }: Props) {
   }
 
   function handleBellPress() {
-    if (pendingCount > 0) {
+    if (unreadMessagesTotal > 0) {
+      navigation.navigate("MessagesList");
+    } else if (pendingCount > 0) {
       Alert.alert(
         "Synchronisation en attente",
         `${pendingCount} brouillon${pendingCount > 1 ? "s" : ""} enregistré${pendingCount > 1 ? "s" : ""} sur cet appareil, en attente de synchronisation.`,
@@ -140,7 +145,7 @@ export function DashboardScreen({ navigation }: Props) {
             style={{ padding: spacing.xs }}
           >
             <Icon name="bell" size={24} color={colors.text} />
-            {pendingCount > 0 ? (
+            {unreadMessagesTotal > 0 || pendingCount > 0 ? (
               <View
                 style={{
                   position: "absolute",
@@ -149,7 +154,7 @@ export function DashboardScreen({ navigation }: Props) {
                   width: 8,
                   height: 8,
                   borderRadius: 4,
-                  backgroundColor: colors.warn,
+                  backgroundColor: unreadMessagesTotal > 0 ? colors.danger : colors.warn,
                 }}
               />
             ) : null}
@@ -244,7 +249,43 @@ export function DashboardScreen({ navigation }: Props) {
       <View style={{ paddingHorizontal: spacing.xxl, marginTop: spacing.xxl }}>
         <Text style={[typography.label, { color: colors.textMuted, marginBottom: spacing.md }]}>SERVICES</Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" }}>
-          {SERVICES.map((service) => (
+          <Pressable onPress={() => navigation.navigate("MessagesList")} style={{ width: "48%", marginBottom: spacing.md }}>
+            <Card style={{ alignItems: "center", paddingVertical: spacing.lg }}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: colors.accentSoft,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: spacing.sm,
+                }}
+              >
+                <Icon name="message" size={20} color={colors.accentStrong} />
+                {unreadMessagesTotal > 0 ? (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: -2,
+                      right: -2,
+                      width: 10,
+                      height: 10,
+                      borderRadius: 5,
+                      backgroundColor: colors.danger,
+                    }}
+                  />
+                ) : null}
+              </View>
+              <Text style={[typography.body, { color: colors.text, fontWeight: "600", textAlign: "center" }]}>
+                Mes messages
+              </Text>
+              <Text style={[typography.caption, { color: colors.textMuted, textAlign: "center", marginTop: 2 }]}>
+                Discutez avec le dermatologue
+              </Text>
+            </Card>
+          </Pressable>
+          {OTHER_SERVICES.map((service) => (
             <Pressable
               key={service.label}
               onPress={() => notifyComingSoon(service.label)}

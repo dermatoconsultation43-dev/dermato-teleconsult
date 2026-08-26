@@ -12,6 +12,8 @@ import { OnboardingScreen } from "../screens/onboarding/OnboardingScreen";
 import { LoginScreen } from "../screens/auth/LoginScreen";
 import { SignUpScreen } from "../screens/auth/SignUpScreen";
 import { DashboardScreen } from "../screens/dashboard/DashboardScreen";
+import { MessagesListScreen } from "../screens/messages/MessagesListScreen";
+import { ConsultationChatScreen } from "../screens/messages/ConsultationChatScreen";
 import { AdminNavigator } from "./AdminNavigator";
 import { AgentNavigator } from "./AgentNavigator";
 import { ConsultationNavigator } from "./ConsultationNavigator";
@@ -120,7 +122,7 @@ export function RootNavigator() {
   }
 
   if (status === "loading") {
-    return <LoadingScreen />;
+    return <LoadingScreen onSignOut={() => signOut()} />;
   }
 
   if (status === "error") {
@@ -140,6 +142,8 @@ export function RootNavigator() {
           <>
             <Stack.Screen name="PatientDashboard" component={DashboardScreen} />
             <Stack.Screen name="NewConsultation" component={ConsultationNavigator} />
+            <Stack.Screen name="MessagesList" component={MessagesListScreen} />
+            <Stack.Screen name="ConsultationChat" component={ConsultationChatScreen} />
           </>
         ) : (
           // Un compte "agent" (voir AdminProfile.role) atterrit directement sur le

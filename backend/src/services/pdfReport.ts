@@ -112,7 +112,7 @@ type ConsultationForPdf = Prisma.ConsultationGetPayload<{
 
 export async function generateConsultationReportPdf(
   consultation: ConsultationForPdf,
-  patientFallback: { telephone: string; email: string | null } | null,
+  patientFallback: { telephone: string | null; email: string | null } | null,
 ): Promise<Buffer> {
   const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
   const chunks: Buffer[] = [];

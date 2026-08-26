@@ -1,18 +1,29 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Animated, Easing, Image, Text, View } from "react-native";
 import { useTheme } from "../theme/useTheme";
 import { BottomWave } from "../components/decor/Waves";
+import { Button } from "../components/Button";
 
 const LOGO = require("../assets/brand/logo.jpg");
+
+// Au-delà de ce délai, on suppose que l'utilisateur a compris que ça traîne — pas la
+// peine d'attendre les 70s du timeout réseau (voir REQUEST_TIMEOUT_MS dans client.ts,
+// qui couvre le réveil du backend Render gratuit) pour lui laisser une échappatoire.
+const FALLBACK_DELAY_MS = 6000;
+
+interface Props {
+  onSignOut: () => void;
+}
 
 // Prolonge visuellement l'écran de démarrage natif (même fond, voir
 // android/app/src/main/res/values/colors.xml#splashBackground) pendant la brève
 // vérification de session Firebase — aucune coupure entre le natif et le JS.
-export function LoadingScreen() {
+export function LoadingScreen({ onSignOut }: Props) {
   const { colors, spacing, typography } = useTheme();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(8)).current;
   const spin = useRef(new Animated.Value(0)).current;
+  const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -23,6 +34,11 @@ export function LoadingScreen() {
       Animated.timing(spin, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true }),
     ).start();
   }, [opacity, translateY, spin]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setShowFallback(true), FALLBACK_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
@@ -60,6 +76,15 @@ export function LoadingScreen() {
             transform: [{ rotate }],
           }}
         />
+
+        {showFallback ? (
+          <View style={{ alignItems: "center", marginTop: spacing.xxl, paddingHorizontal: spacing.xl }}>
+            <Text style={[typography.caption, { color: colors.textMuted, textAlign: "center", marginBottom: spacing.md }]}>
+              La connexion prend plus de temps que prévu (le serveur peut se réveiller après une pause).
+            </Text>
+            <Button label="Se déconnecter" variant="ghost" onPress={onSignOut} />
+          </View>
+        ) : null}
       </Animated.View>
     </View>
   );

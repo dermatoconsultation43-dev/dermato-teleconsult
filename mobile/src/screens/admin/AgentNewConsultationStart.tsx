@@ -28,19 +28,19 @@ export function AgentNewConsultationStart({ navigation }: Props) {
   const setMode = useConsultationDraftStore((s) => s.setMode);
   const updateDraft = useConsultationDraftStore((s) => s.updateDraft);
   const [nomComplet, setNomComplet] = useState("");
-  const [telephone, setTelephone] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const canGoBack = navigation.canGoBack();
 
   function handleStart() {
-    if (!nomComplet.trim() || !telephone.trim()) {
-      setError("Le nom complet et le numéro de téléphone sont requis.");
+    if (!nomComplet.trim()) {
+      setError("Le nom complet est requis.");
       return;
     }
     setError(null);
     resetDraft();
     setMode("agent");
-    updateDraft({ nomComplet: nomComplet.trim(), telephoneContact: telephone.trim() });
+    updateDraft({ nomComplet: nomComplet.trim(), ...(email.trim() ? { emailContact: email.trim() } : {}) });
     navigation.navigate("AgentConsultation");
   }
 
@@ -134,15 +134,16 @@ export function AgentNewConsultationStart({ navigation }: Props) {
 
         <View style={{ flexDirection: "row" }}>
           <View style={[styles.fieldIcon, { backgroundColor: colors.accentSoft }]}>
-            <Icon name="phone" size={18} color={colors.accentStrong} />
+            <Icon name="mail" size={18} color={colors.accentStrong} />
           </View>
           <View style={{ flex: 1, marginLeft: spacing.md }}>
             <TextField
-              label="Numéro de téléphone *"
-              placeholder="Saisissez le numéro de téléphone"
-              value={telephone}
-              onChangeText={setTelephone}
-              keyboardType="phone-pad"
+              label="Adresse email"
+              placeholder="Saisissez l'adresse email (facultatif)"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
             />
           </View>
         </View>

@@ -10,6 +10,7 @@ import { healthRouter } from "./modules/health/health.routes.js";
 import { patientsRouter } from "./modules/patients/patients.routes.js";
 import { consultationsRouter } from "./modules/consultations/consultations.routes.js";
 import { photosRouter } from "./modules/photos/photos.routes.js";
+import { messagesRouter } from "./modules/messages/messages.routes.js";
 import { availabilitiesRouter } from "./modules/availabilities/availabilities.routes.js";
 import { lesionTypesRouter } from "./modules/lesionTypes/lesionTypes.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
@@ -45,6 +46,7 @@ export function createApp() {
   app.use("/api/v1/patients", patientsRouter);
   app.use("/api/v1/consultations", consultationsRouter);
   app.use("/api/v1/consultations/:consultationId/photos", photosRouter);
+  app.use("/api/v1/consultations/:consultationId/messages", messagesRouter);
   app.use("/api/v1/availabilities", availabilitiesRouter);
   app.use("/api/v1/lesion-types", lesionTypesRouter);
   // Ordre important : /admin/agent-consultations doit être monté AVANT le

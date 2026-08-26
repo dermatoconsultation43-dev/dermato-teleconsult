@@ -5,12 +5,14 @@ import type { ApiErrorBody } from "../../types/api";
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  readonly details: unknown;
 
-  constructor(status: number, code: string, message: string) {
+  constructor(status: number, code: string, message: string, details?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
+    this.details = details;
   }
 }
 
@@ -79,6 +81,7 @@ export async function apiRequest<TResponse>(path: string, options: RequestOption
       response.status,
       errorBody?.error?.code ?? "unknown_error",
       errorBody?.error?.message ?? "Une erreur est survenue.",
+      errorBody?.error?.details,
     );
   }
 
@@ -119,6 +122,7 @@ export async function apiUpload<TResponse>(path: string, formData: FormData): Pr
       response.status,
       errorBody?.error?.code ?? "unknown_error",
       errorBody?.error?.message ?? "Une erreur est survenue.",
+      errorBody?.error?.details,
     );
   }
 

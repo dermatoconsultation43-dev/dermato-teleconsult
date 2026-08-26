@@ -25,6 +25,7 @@ const records: MockConsultation[] = [
   {
     id: "dev-c1",
     refNumber: 100234,
+    unreadMessagesCount: 0,
     status: "pending",
     submittedAt: now,
     createdAt: now,
@@ -69,6 +70,7 @@ const records: MockConsultation[] = [
   {
     id: "dev-c2",
     refNumber: 100235,
+    unreadMessagesCount: 0,
     status: "confirmed",
     submittedAt: now,
     createdAt: now,
@@ -124,6 +126,7 @@ const records: MockConsultation[] = [
   {
     id: "dev-c3",
     refNumber: 100236,
+    unreadMessagesCount: 0,
     status: "seen",
     submittedAt: now,
     createdAt: now,
@@ -199,6 +202,7 @@ export function listMockAdminConsultations(status?: ConsultationStatus, search?:
       nomComplet: r.nomComplet ?? null,
       telephoneContact: r.telephoneContact ?? null,
       patient: { nom: r.patient.nom, prenom: r.patient.prenom, telephone: r.patient.telephone },
+      unreadMessagesCount: r.unreadMessagesCount,
     }));
 }
 

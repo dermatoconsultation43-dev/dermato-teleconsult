@@ -11,7 +11,7 @@ const DEV_API_URL = "http://localhost:8080/api/v1";
 // prod) — tourne en permanence, indépendamment de toute machine de dev. Palier
 // gratuit Render : le service s'endort après ~15 min sans trafic, la toute
 // première requête après une pause peut prendre 30-50s le temps qu'il se réveille.
-const PROD_API_URL = "https://dermato-backend-esfm.onrender.com/api/v1";
+const PROD_API_URL = "https://dermato-teleconsult.onrender.com/api/v1";
 
 export const env = {
   apiBaseUrl: __DEV__ ? DEV_API_URL : PROD_API_URL,

@@ -37,6 +37,16 @@ let syncingPhotos = false;
 let syncingConsents = false;
 let syncingSubmits = false;
 
+// Filet de sécurité en plus du déclenchement sur changement de connectivité :
+// un échec ponctuel (backend qui redémarre le temps d'un déploiement, coupure
+// trop brève pour que le téléphone la détecte comme un vrai changement d'état
+// réseau) laisse sinon un élément "en attente" indéfiniment tant que
+// isConnected/isInternetReachable ne rebasculent pas vraiment. L'utilisateur
+// (souvent un agent terrain, pas quelqu'un qui va aller chercher un bouton
+// "Réessayer" ou couper/rallumer le mode avion) n'a rien à faire : ça se
+// résorbe tout seul en arrière-plan.
+const RETRY_INTERVAL_MS = 30000;
+
 function refreshPendingCount(): void {
   // Un seul compteur affiché (voir OfflineBanner) : la somme des quatre files —
   // peu importe, du point de vue de l'utilisateur, que ce soit du texte, une
@@ -72,6 +82,13 @@ export function initSyncEngine(): void {
       void syncAll();
     }
   });
+
+  setInterval(() => {
+    const { isOnline, pendingCount } = useOfflineStore.getState();
+    if (isOnline && pendingCount > 0) {
+      void syncAll();
+    }
+  }, RETRY_INTERVAL_MS);
 }
 
 // Ordre important : les brouillons d'abord (leur succès débloque, via
@@ -98,15 +115,14 @@ export async function syncPendingDrafts(): Promise<void> {
       markDraftStatus(row.clientUuid, "syncing");
 
       try {
-        // Le mode ("patient" ou "agent") n'est pas conservé dans draft_queue —
-        // seul le formulaire en cours dans le store sait sous quelle identité il
-        // a été rempli. Un brouillon mis en file par une session précédente
-        // (app fermée avant reconnexion) est donc rejoué en mode "patient" par
-        // défaut ; le mode terrain vise surtout des sessions continues où
-        // l'admin reste dans l'app jusqu'au retour de connexion.
-        const activeDraft = useConsultationDraftStore.getState();
-        const mode = activeDraft.clientUuid === row.clientUuid ? activeDraft.mode : "patient";
-        const result = mode === "agent" ? await saveWalkInDraft(row.clientUuid, row.payload) : await saveDraft(row.clientUuid, row.payload);
+        // Le mode ("patient" ou "agent") est celui enregistré dans draft_queue au
+        // moment de la mise en file (voir draftQueue.ts#saveDraftLocally) — pas
+        // celui du formulaire actif, qui a pu changer ou avoir été réinitialisé
+        // depuis (ex. redémarrage de l'app), et rejouer sur le mauvais point
+        // d'accès échouerait (403 "Aucun profil patient actif pour ce compte."
+        // si un dossier agent est rejoué via l'endpoint patient, et vice-versa).
+        const result =
+          row.mode === "agent" ? await saveWalkInDraft(row.clientUuid, row.payload) : await saveDraft(row.clientUuid, row.payload);
         removeDraftLocally(row.clientUuid);
         useOfflineStore.getState().setDraftStatus(row.clientUuid, "synced");
         setPhotoConsultationId(row.clientUuid, result.id);
@@ -116,6 +132,7 @@ export async function syncPendingDrafts(): Promise<void> {
         // Si le brouillon actif dans le formulaire en cours est celui qu'on
         // vient de synchroniser, on lui donne son id serveur pour débloquer
         // les étapes suivantes (photos, consentement) qui en ont besoin.
+        const activeDraft = useConsultationDraftStore.getState();
         if (activeDraft.clientUuid === row.clientUuid && !activeDraft.consultationId) {
           activeDraft.setConsultationMeta(result.id, result.refNumber);
         }
