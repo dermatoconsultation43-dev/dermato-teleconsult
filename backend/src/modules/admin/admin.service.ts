@@ -341,7 +341,7 @@ export async function changeConsultationStatus(
 // Suppression logicielle d'un dossier : marque deletedAt pour archivage
 // (sans vraiment effacer les données). Seul un dossier confirmé, vu ou complété
 // peut être supprimé (pas un brouillon ou un dossier en attente).
-export async function deleteConsultation(consultationId: string, reason: string) {
+export async function deleteConsultation(consultationId: string, reason: string, adminId: string) {
   const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
   if (!consultation) throw new NotFoundError("Consultation introuvable.");
 
@@ -367,6 +367,7 @@ export async function deleteConsultation(consultationId: string, reason: string)
         previousStatus: consultation.status,
         newStatus: consultation.status, // Statut inchangé, mais marqué comme supprimé
         changedByType: "admin",
+        changedByAdminId: adminId,
         reason: `Suppression : ${reason}`,
       },
     });

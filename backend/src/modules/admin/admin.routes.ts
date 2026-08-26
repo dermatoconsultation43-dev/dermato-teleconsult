@@ -137,7 +137,7 @@ adminRouter.delete(
   validate({ params: consultationIdParamsSchema, body: deleteConsultationSchema }),
   async (req, res, next) => {
     try {
-      const consultation = await deleteConsultation(req.params.id, req.body.reason);
+      const consultation = await deleteConsultation(req.params.id, req.body.reason, req.auth!.admin!.id);
       res.json({ success: true, consultation });
     } catch (error) {
       next(error);
