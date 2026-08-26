@@ -35,15 +35,15 @@ export function SummaryScreen({ navigation }: Props) {
   const isDevPreview = useIsDevPreview();
   const isOnline = useOfflineStore((s) => s.isOnline);
 
-  // "queued"/"uploading" comptent comme prêt pour AVANCER dans le questionnaire
-  // (voir selectRequiredPhotosReady), mais pas pour la soumission finale : le
-  // serveur exige des photos réellement reçues. Utilisé seulement pour choisir
-  // entre envoi immédiat et mise en file (voir handleSubmit) — jamais pour
-  // bloquer le bouton : un agent terrain doit pouvoir enchaîner ses dossiers
-  // sans connexion du tout, sur toute une tournée.
-  const pendingPhotoSlots = REQUIRED_PHOTO_SLOTS.filter(
-    (slot) => !photos.some((p) => p.slot === slot && p.status === "uploaded"),
-  );
+  // Les photos ne sont plus obligatoires (un problème de peau peut n'avoir aucune
+  // lésion visible) — l'absence totale d'une vue ne doit donc pas forcer la mise
+  // en file. Seule une photo réellement en cours d'envoi/en attente compte comme
+  // "pas encore prête", pour choisir entre envoi immédiat et mise en file (voir
+  // handleSubmit) — jamais pour bloquer le bouton : un agent terrain doit pouvoir
+  // enchaîner ses dossiers sans connexion du tout, sur toute une tournée.
+  const pendingPhotoSlots = photos
+    .filter((p) => REQUIRED_PHOTO_SLOTS.includes(p.slot) && p.status !== "uploaded")
+    .map((p) => p.slot);
   const canSubmitNow = isOnline && pendingPhotoSlots.length === 0;
 
   function Section({

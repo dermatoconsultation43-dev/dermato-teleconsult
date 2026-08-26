@@ -85,12 +85,3 @@ export const useConsultationDraftStore = create<ConsultationDraftState>((set) =>
     }),
 }));
 
-// "queued" compte comme prêt : la photo est bien capturée et sera envoyée
-// automatiquement dès que possible (voir services/offline/photoQueue.ts) — rien
-// n'empêche de continuer le questionnaire hors ligne. Seule la soumission finale
-// (SummaryScreen) exige une vraie connexion, et le serveur revérifie de toute
-// façon que les photos sont réellement "uploaded" avant d'accepter l'envoi.
-export function selectRequiredPhotosReady(photos: LocalPhoto[]): boolean {
-  const captured = new Set(photos.filter((p) => p.status === "uploaded" || p.status === "queued").map((p) => p.slot));
-  return captured.has("vue_generale") && captured.has("vue_rapprochee");
-}

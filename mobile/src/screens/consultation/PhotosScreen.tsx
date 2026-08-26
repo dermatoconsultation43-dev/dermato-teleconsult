@@ -8,7 +8,7 @@ import { Button } from "../../components/Button";
 import { ChoiceGroup } from "../../components/ChoiceGroup";
 import { Icon } from "../../components/icons/Icon";
 import { useTheme } from "../../theme/useTheme";
-import { useConsultationDraftStore, selectRequiredPhotosReady, type LocalPhoto } from "../../store/consultationDraftStore";
+import { useConsultationDraftStore, type LocalPhoto } from "../../store/consultationDraftStore";
 import { useOfflineStore } from "../../store/offlineStore";
 import { useIsDevPreview } from "../../hooks/useIsDevPreview";
 import { uploadPhoto } from "../../services/api/photos";
@@ -20,10 +20,10 @@ import type { PhotoSlot } from "../../types/api";
 
 type Props = NativeStackScreenProps<ConsultationStackParamList, "Photos">;
 
-const SLOTS: Array<{ slot: PhotoSlot; title: string; required: boolean }> = [
-  { slot: "vue_generale", title: "Vue générale *", required: true },
-  { slot: "vue_rapprochee", title: "Vue rapprochée *", required: true },
-  { slot: "complementaire", title: "Photo supplémentaire", required: false },
+const SLOTS: Array<{ slot: PhotoSlot; title: string }> = [
+  { slot: "vue_generale", title: "Vue générale" },
+  { slot: "vue_rapprochee", title: "Vue rapprochée" },
+  { slot: "complementaire", title: "Photo supplémentaire" },
 ];
 
 const TIPS = [
@@ -143,14 +143,14 @@ export function PhotosScreen({ navigation }: Props) {
     return photos.filter((p) => p.slot === slot);
   }
 
-  const canContinue = selectRequiredPhotosReady(photos) && draft.photosQualiteConfirmee === true;
+  // Un problème de peau peut exister sans lésion visible à photographier (ex.
+  // démangeaison seule) — les photos ne sont donc plus obligatoires pour avancer.
+  // La question de qualité ne se pose que s'il y a au moins une photo à juger.
+  const hasAnyPhoto = photos.some((p) => p.status === "uploaded" || p.status === "queued" || p.status === "uploading");
+  const canContinue = !hasAnyPhoto || draft.photosQualiteConfirmee === true;
 
   function handleContinue() {
-    if (!selectRequiredPhotosReady(photos)) {
-      setStepError("Ajoutez au moins une vue générale et une vue rapprochée.");
-      return;
-    }
-    if (draft.photosQualiteConfirmee !== true) {
+    if (hasAnyPhoto && draft.photosQualiteConfirmee !== true) {
       setStepError("Confirmez que vos photos sont nettes et de bonne qualité avant de continuer.");
       return;
     }
@@ -177,7 +177,7 @@ export function PhotosScreen({ navigation }: Props) {
         ))}
       </Card>
 
-      {SLOTS.map(({ slot, title, required }) => {
+      {SLOTS.map(({ slot, title }) => {
         const slotPhotos = renderSlotPhotos(slot);
         return (
           <View key={slot} style={{ marginBottom: spacing.xxl }}>
@@ -237,24 +237,25 @@ export function PhotosScreen({ navigation }: Props) {
               </View>
             ) : null}
 
-            {required && slotPhotos.length === 0 ? (
-              <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>Requis</Text>
-            ) : null}
           </View>
         );
       })}
 
-      <Text style={[typography.label, { color: colors.text, marginBottom: spacing.sm }]}>
-        Vos photos sont-elles nettes et de bonne qualité ? *
-      </Text>
-      <ChoiceGroup
-        options={[
-          { value: "oui", label: "Oui" },
-          { value: "non", label: "Non" },
-        ]}
-        selected={draft.photosQualiteConfirmee === undefined ? [] : [draft.photosQualiteConfirmee ? "oui" : "non"]}
-        onChange={([value]) => updateDraft({ photosQualiteConfirmee: value === "oui" })}
-      />
+      {hasAnyPhoto ? (
+        <>
+          <Text style={[typography.label, { color: colors.text, marginBottom: spacing.sm }]}>
+            Vos photos sont-elles nettes et de bonne qualité ? *
+          </Text>
+          <ChoiceGroup
+            options={[
+              { value: "oui", label: "Oui" },
+              { value: "non", label: "Non" },
+            ]}
+            selected={draft.photosQualiteConfirmee === undefined ? [] : [draft.photosQualiteConfirmee ? "oui" : "non"]}
+            onChange={([value]) => updateDraft({ photosQualiteConfirmee: value === "oui" })}
+          />
+        </>
+      ) : null}
     </StepScreen>
   );
 }

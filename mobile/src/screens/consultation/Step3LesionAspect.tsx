@@ -32,9 +32,11 @@ const LESION_IMAGES: Record<string, ReturnType<typeof require>> = {
   // (ChoiceGroup gère nativement une option sans image, voir gallery variant).
 };
 
-// Mode aperçu dev (voir LoginScreen) : copie locale du référentiel de
-// backend/prisma/seed.ts, pour parcourir cet écran sans appel serveur possible.
-const DEV_PREVIEW_LESION_TYPES: LesionTypeOption[] = [
+// Copie locale du référentiel de backend/prisma/seed.ts — sert au mode aperçu dev
+// (voir LoginScreen, aucun appel serveur possible), mais aussi de repli hors ligne :
+// un agent terrain sans connexion doit pouvoir choisir un aspect de lésion même si
+// /lesion-types n'a jamais pu être chargé sur cet appareil (voir plus bas, `items`).
+const FALLBACK_LESION_TYPES: LesionTypeOption[] = [
   { code: "tache", labelFr: "Taches", description: "Zone de peau dont la couleur diffère, sans relief.", displayOrder: 1 },
   { code: "papule", labelFr: "Papules", description: "Petites lésions solides en relief.", displayOrder: 2 },
   { code: "plaque", labelFr: "Plaques", description: "Lésions plus larges, en relief ou non.", displayOrder: 3 },
@@ -61,7 +63,7 @@ export function Step3LesionAspect({ navigation }: Props) {
     queryFn: listLesionTypes,
     enabled: !isDevPreview,
   });
-  const items = isDevPreview ? DEV_PREVIEW_LESION_TYPES : (data?.items ?? []);
+  const items = isDevPreview || !data?.items?.length ? FALLBACK_LESION_TYPES : data.items;
 
   const selectedCodes = draft.lesionTypes?.map((l) => l.code) ?? [];
   const hasAutre = selectedCodes.includes("autre");
