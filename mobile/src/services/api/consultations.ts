@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import { sanitizeDraftAvailabilities } from "./availabilities";
 import type { ConsultationDraft, ConsultationStatus, ConsultationSummary } from "../../types/api";
 
 export function listMyConsultations(status?: ConsultationStatus) {
@@ -14,7 +15,10 @@ export function getConsultation(id: string) {
 // du brouillon et réutilisé à chaque sauvegarde — c'est la clé d'idempotence qui
 // évite les doublons quand la synchro est rejouée après une coupure réseau.
 export function saveDraft(clientUuid: string, draft: ConsultationDraft) {
-  return apiRequest<ConsultationSummary>(`/consultations/draft/${clientUuid}`, { method: "PUT", body: draft });
+  return apiRequest<ConsultationSummary>(`/consultations/draft/${clientUuid}`, {
+    method: "PUT",
+    body: sanitizeDraftAvailabilities(draft),
+  });
 }
 
 export function recordConsent(consultationId: string, consentTextVersion: string) {

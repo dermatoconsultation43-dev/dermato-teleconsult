@@ -1,4 +1,5 @@
 import { apiRequest, apiUpload } from "./client";
+import { sanitizeDraftAvailabilities } from "./availabilities";
 import type { ConsultationDraft, ConsultationSummary, Photo, PhotoSlot } from "../../types/api";
 
 // Miroir de services/api/consultations.ts + photos.ts, mais pour le mode "agent
@@ -9,7 +10,10 @@ import type { ConsultationDraft, ConsultationSummary, Photo, PhotoSlot } from ".
 // services métier que le parcours patient normal.
 
 export function saveWalkInDraft(clientUuid: string, draft: ConsultationDraft) {
-  return apiRequest<ConsultationSummary>(`/admin/agent-consultations/draft/${clientUuid}`, { method: "PUT", body: draft });
+  return apiRequest<ConsultationSummary>(`/admin/agent-consultations/draft/${clientUuid}`, {
+    method: "PUT",
+    body: sanitizeDraftAvailabilities(draft),
+  });
 }
 
 export function recordWalkInConsent(consultationId: string, consentTextVersion: string) {

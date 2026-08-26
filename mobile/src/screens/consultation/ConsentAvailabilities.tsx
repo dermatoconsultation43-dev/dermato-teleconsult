@@ -28,16 +28,21 @@ const CONSENT_TEXT =
   "au professionnel de santé en charge de ma téléconsultation, dans le seul but d'évaluer ma demande. Ces données " +
   "sont conservées de façon sécurisée et ne sont accessibles qu'aux personnes autorisées.";
 
-// Mode aperçu dev (voir LoginScreen) : copie locale du référentiel de
-// backend/prisma/seed.ts, pour parcourir cet écran sans appel serveur possible.
-const DEV_PREVIEW_AVAILABILITIES: Availability[] = [
-  { id: "dev-lundi", jourSemaine: "lundi", label: "Lundi 19h30–20h30", actif: true },
-  { id: "dev-mardi", jourSemaine: "mardi", label: "Mardi 19h30–20h30", actif: true },
-  { id: "dev-mercredi", jourSemaine: "mercredi", label: "Mercredi 19h30–20h30", actif: true },
-  { id: "dev-jeudi", jourSemaine: "jeudi", label: "Jeudi 19h30–20h30", actif: true },
-  { id: "dev-vendredi", jourSemaine: "vendredi", label: "Vendredi 19h30–20h30", actif: true },
-  { id: "dev-samedi-matin", jourSemaine: "samedi", label: "Samedi 09h00–12h00", actif: true },
-  { id: "dev-samedi-apresmidi", jourSemaine: "samedi", label: "Samedi 16h00–18h00", actif: true },
+// Copie locale du référentiel de backend/prisma/seed.ts — sert au mode aperçu dev
+// (voir LoginScreen, aucun appel serveur possible), mais aussi de repli hors ligne :
+// sans lui, un dossier rempli hors connexion n'affichait que "Autres plages" (voir
+// `availabilityItems` plus bas), la vraie liste ne pouvant jamais être chargée.
+// `id` = le libellé lui-même (pas un vrai UUID de la table Availability, aucun
+// moyen de le connaître hors ligne) : sanitizeDraftAvailabilities (services/api/
+// availabilities.ts) le convertit en texte libre juste avant l'envoi.
+const FALLBACK_AVAILABILITIES: Availability[] = [
+  { id: "Lundi 19h30–20h30", jourSemaine: "lundi", label: "Lundi 19h30–20h30", actif: true },
+  { id: "Mardi 19h30–20h30", jourSemaine: "mardi", label: "Mardi 19h30–20h30", actif: true },
+  { id: "Mercredi 19h30–20h30", jourSemaine: "mercredi", label: "Mercredi 19h30–20h30", actif: true },
+  { id: "Jeudi 19h30–20h30", jourSemaine: "jeudi", label: "Jeudi 19h30–20h30", actif: true },
+  { id: "Vendredi 19h30–20h30", jourSemaine: "vendredi", label: "Vendredi 19h30–20h30", actif: true },
+  { id: "Samedi 09h00–12h00", jourSemaine: "samedi", label: "Samedi 09h00–12h00", actif: true },
+  { id: "Samedi 16h00–18h00", jourSemaine: "samedi", label: "Samedi 16h00–18h00", actif: true },
 ];
 
 // Dernière étape du questionnaire : consentement puis disponibilités — deux
@@ -63,7 +68,7 @@ export function ConsentAvailabilities({ navigation }: Props) {
     queryFn: listAvailabilities,
     enabled: !isDevPreview,
   });
-  const availabilityItems = isDevPreview ? DEV_PREVIEW_AVAILABILITIES : (data?.items ?? []);
+  const availabilityItems = isDevPreview || !data?.items?.length ? FALLBACK_AVAILABILITIES : data.items;
 
   const selections = draft.availabilities ?? [];
   const selectedIds = selections.filter((s) => s.availabilityId).map((s) => s.availabilityId as string);
