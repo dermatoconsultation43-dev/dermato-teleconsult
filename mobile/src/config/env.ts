@@ -7,11 +7,10 @@
 // qu'avec l'émulateur AVD par défaut, pas avec un téléphone physique.
 const DEV_API_URL = "http://localhost:8080/api/v1";
 
-// Backend déployé sur Render (voir backend/README ou la conversation de mise en
-// prod) — tourne en permanence, indépendamment de toute machine de dev. Palier
-// gratuit Render : le service s'endort après ~15 min sans trafic, la toute
-// première requête après une pause peut prendre 30-50s le temps qu'il se réveille.
-const PROD_API_URL = "https://dermato-teleconsult.onrender.com/api/v1";
+// Backend hébergé sur Render, mais joint via un relais Vercel (voir proxy/) :
+// certains opérateurs mobiles coupent les connexions vers les IP de Render, ce
+// qui rendait l'app inutilisable en 4G. Le relais retransmet /api/* tel quel.
+const PROD_API_URL = "https://dermato-teleconsult-proxy.vercel.app/api/v1";
 
 export const env = {
   apiBaseUrl: __DEV__ ? DEV_API_URL : PROD_API_URL,
