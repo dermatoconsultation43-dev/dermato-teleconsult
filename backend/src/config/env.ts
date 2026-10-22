@@ -24,6 +24,11 @@ const envSchema = z.object({
   GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, "GOOGLE_OAUTH_CLIENT_SECRET est requis"),
   GOOGLE_OAUTH_REFRESH_TOKEN: z.string().min(1, "GOOGLE_OAUTH_REFRESH_TOKEN est requis"),
   GOOGLE_DRIVE_PHOTOS_FOLDER_ID: z.string().min(1, "GOOGLE_DRIVE_PHOTOS_FOLDER_ID est requis"),
+  // Dossier séparé pour les conclusions médicales rédigées par l'admin (voir
+  // services/pdfReport.ts#uploadConclusionPdfToDrive) — jamais mélangées aux photos/
+  // rapports patient, pour que le dermatologue retrouve ses propres comptes-rendus
+  // sans les noyer dans les pièces jointes brutes des patients.
+  GOOGLE_DRIVE_RESPONSES_FOLDER_ID: z.string().min(1, "GOOGLE_DRIVE_RESPONSES_FOLDER_ID est requis"),
 
   RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(300),

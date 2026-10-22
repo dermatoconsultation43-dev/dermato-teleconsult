@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Alert, Image, Text, View, type ImageSourcePropType } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
@@ -11,7 +11,16 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { BODY_ZONE_LABELS } from "../../components/BodyMap";
 import { useTheme } from "../../theme/useTheme";
 import { useAuthStore } from "../../store/authStore";
-import { adminPhotoViewPath, changeConsultationStatus, deleteConsultation, getAdminConsultationDetail, updateAppointment } from "../../services/api/admin";
+import {
+  adminPhotoViewPath,
+  changeConsultationStatus,
+  consultationPatientName,
+  deleteConsultation,
+  formatDossierNumber,
+  getAdminConsultationDetail,
+  saveConsultationConclusion,
+  updateAppointment,
+} from "../../services/api/admin";
 import { getPhotoDataUri } from "../../services/api/photos";
 import { getMockAdminConsultationDetail, updateMockConsultationStatus } from "../../services/devPreview/adminMock";
 import { ApiError } from "../../services/api/client";
@@ -185,6 +194,10 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
   const [reason, setReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
 
+  const [conclusionText, setConclusionText] = useState("");
+  const [conclusionError, setConclusionError] = useState<string | null>(null);
+  const conclusionInitializedFor = useRef<string | null>(null);
+
   // TS 5.0.4 (voir mobile/package.json) n'infère pas correctement le générique de
   // useQuery avec cette version de @tanstack/react-query — cast explicite pour éviter
   // que `data` ne retombe silencieusement en `any` (voir tsc --noEmit avant ce commit).
@@ -198,6 +211,16 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
   const photoSources = mockConsultation?.photoSources;
   const { isLoading, isError, refetch } = query;
 
+  // Pré-remplit le champ conclusion une seule fois par dossier chargé (pas à chaque
+  // refetch) — sinon une réponse serveur après un simple changement de statut
+  // écraserait le texte en cours de frappe de l'admin.
+  useEffect(() => {
+    if (data && conclusionInitializedFor.current !== data.id) {
+      setConclusionText(data.conclusionMedicale ?? "");
+      conclusionInitializedFor.current = data.id;
+    }
+  }, [data]);
+
   const mutation = useMutation({
     mutationFn: (input: Parameters<typeof changeConsultationStatus>[1]) =>
       isDevPreview ? Promise.resolve(updateMockConsultationStatus(id, input)) : changeConsultationStatus(id, input),
@@ -207,6 +230,11 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
       } else {
         queryClient.invalidateQueries({ queryKey: ["admin", "consultation", id] });
         queryClient.invalidateQueries({ queryKey: ["admin", "consultations"] });
+        // Un changement de statut (ex. "terminé") change les compteurs de l'accueil
+        // admin — sans ça, "Dossiers traités" reste sur sa valeur au premier
+        // chargement de l'app tant que l'accueil n'est pas remonté (retour en
+        // arrière ne suffit pas, voir AdminDashboardScreen.tsx).
+        queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
       }
       setActionMode(null);
       setSelectedAvailabilityId(null);
@@ -237,11 +265,40 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
     },
   });
 
+  const saveConclusionMutation = useMutation({
+    mutationFn: (text: string) => saveConsultationConclusion(id, text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "consultation", id] });
+      setConclusionError(null);
+      // L'enregistrement prend 2-3s (génération du PDF + envoi Drive) sans autre
+      // retour visuel que la ligne "Dernier enregistrement" au-dessus du champ,
+      // facile à manquer — d'où la confirmation explicite ici.
+      Alert.alert("Enregistré", "La conclusion a été enregistrée et déposée dans le dossier Drive dédié.");
+    },
+    onError: (err) => {
+      setConclusionError(err instanceof ApiError ? err.message : "Échec de l'enregistrement de la conclusion.");
+    },
+  });
+
+  function handleSaveConclusion() {
+    if (!conclusionText.trim()) {
+      setConclusionError("La conclusion ne peut pas être vide.");
+      return;
+    }
+    if (isDevPreview) {
+      Alert.alert("Aperçu de démo", "L'enregistrement sur Drive n'est pas disponible en mode démo.");
+      return;
+    }
+    setConclusionError(null);
+    saveConclusionMutation.mutate(conclusionText.trim());
+  }
+
   const deleteMutation = useMutation({
     mutationFn: (reason: string) =>
       deleteConsultation(id, reason),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin", "consultations"] });
+      queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
       Alert.alert("Succès", "Dossier supprimé avec succès.", [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
@@ -361,10 +418,14 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
 
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: spacing.lg }}>
         <Text style={[typography.h1, { color: colors.text }]}>
-          Dossier n°{String(consultation.refNumber).padStart(6, "0")}
+          Dossier n°{formatDossierNumber(consultation.refNumber)}
         </Text>
         <StatusBadge status={consultation.status} />
       </View>
+      <Text style={[typography.bodyMuted, { color: colors.textMuted, marginTop: 2 }]}>
+        {consultationPatientName({ nomComplet: consultation.nomComplet ?? null, patient: consultation.patient })}
+        {consultation.motif ? ` — ${consultation.motif}` : ""}
+      </Text>
 
       {!isDevPreview ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginTop: spacing.md }}>
@@ -518,6 +579,47 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
               {h.reason ? ` (${h.reason})` : ""}
             </Text>
           ))}
+        </Card>
+      ) : null}
+
+      {consultation.status !== "draft" && consultation.status !== "pending" ? (
+        <Card style={{ marginTop: spacing.lg }}>
+          <Text style={[typography.h2, { color: colors.text, marginBottom: spacing.xs }]}>Conclusion médicale</Text>
+          <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.md }]}>
+            Enregistrée en PDF dans le dossier Drive dédié aux réponses.
+          </Text>
+          {consultation.conclusionSavedAt ? (
+            <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.sm }]}>
+              Dernier enregistrement : {formatDate(consultation.conclusionSavedAt)}
+            </Text>
+          ) : null}
+          <TextField
+            label="Conclusion, diagnostic, recommandations…"
+            value={conclusionText}
+            onChangeText={setConclusionText}
+            multiline
+            numberOfLines={6}
+            style={{ minHeight: 140, textAlignVertical: "top" }}
+          />
+          {conclusionError ? (
+            <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.md }]}>{conclusionError}</Text>
+          ) : null}
+          {(() => {
+            // Une fois enregistré, le bouton reflète cet état (désactivé, libellé
+            // "Enregistré") tant que le texte n'a pas changé — sinon rien ne
+            // distingue visuellement "vient d'être sauvegardé" de "pas encore
+            // envoyé", alors même que la sauvegarde prend 2-3s (PDF + Drive).
+            const isUnchanged =
+              conclusionText.trim().length > 0 && conclusionText.trim() === (consultation.conclusionMedicale ?? "").trim();
+            return (
+              <Button
+                label={isUnchanged && !saveConclusionMutation.isPending ? "Enregistré ✓" : "Enregistrer la réponse"}
+                loading={saveConclusionMutation.isPending}
+                disabled={isUnchanged}
+                onPress={handleSaveConclusion}
+              />
+            );
+          })()}
         </Card>
       ) : null}
 

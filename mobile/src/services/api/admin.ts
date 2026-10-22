@@ -25,6 +25,16 @@ export function consultationPatientPhone(item: Pick<AdminConsultationListItem, "
   return item.telephoneContact?.trim() || item.patient.telephone;
 }
 
+// Numéro de dossier affiché à l'utilisateur : un seul format partout (avant,
+// l'accueil affichait "DC-2026-00012" pendant que la liste et le détail
+// affichaient "n°000012" — deux identifiants différents pour le même dossier).
+// Compteur séquentiel simple (001, 002… 010… 999, 1000…) plutôt que l'id
+// technique brut à 6 chiffres ou un préfixe année, pour rester lisible et
+// suivre un ordre évident.
+export function formatDossierNumber(refNumber: number): string {
+  return String(refNumber).padStart(3, "0");
+}
+
 export interface AdminStats {
   participants: number;
   pending: number;
@@ -108,4 +118,14 @@ export function updateAppointment(id: string, input: UpdateAppointmentInput) {
     `/admin/consultations/${id}/appointment`,
     { method: "PATCH", body: input },
   );
+}
+
+// Conclusion médicale interne (jamais visible côté patient) — génère et dépose un
+// PDF dans un dossier Drive dédié à chaque enregistrement (voir admin.service.ts
+// côté backend).
+export function saveConsultationConclusion(id: string, conclusion: string) {
+  return apiRequest<AdminConsultationDetail>(`/admin/consultations/${id}/conclusion`, {
+    method: "PUT",
+    body: { conclusion },
+  });
 }

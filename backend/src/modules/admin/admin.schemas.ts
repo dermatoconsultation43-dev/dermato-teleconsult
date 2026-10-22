@@ -29,3 +29,7 @@ export const updateAppointmentSchema = z.object({
   scheduledAt: z.coerce.date().optional(),
   notes: z.string().trim().max(1000).optional(),
 });
+
+export const saveConclusionSchema = z.object({
+  conclusion: z.string().trim().min(1, "La conclusion ne peut pas être vide.").max(5000),
+});

@@ -166,6 +166,13 @@ export type AdminConsultationDetail = Omit<ConsultationDraft, "lesionTypes" | "a
     createdByAdmin: { nom: string; prenom: string };
   } | null;
   statusHistory: StatusHistoryEntry[];
+  // Conclusion médicale interne — jamais exposée côté patient (voir
+  // consultations.service.ts#omitAdminOnlyFields côté backend). N'apparaît que
+  // dans les réponses des routes /admin/* (optionnels ici pour ne pas forcer les
+  // objets de démo dev preview, voir services/devPreview/adminMock.ts, à les fournir).
+  conclusionMedicale?: string | null;
+  conclusionSavedAt?: string | null;
+  conclusionDriveFileId?: string | null;
 };
 
 // Un seul fil par dossier — voir Message dans backend/prisma/schema.prisma.

@@ -10,7 +10,7 @@ import { StatusBadge } from "../../components/StatusBadge";
 import { useTheme } from "../../theme/useTheme";
 import { useAuthStore } from "../../store/authStore";
 import { signOut } from "../../services/auth/firebaseAuth";
-import { consultationPatientName, getAdminStats, listAdminConsultations, type AdminStats } from "../../services/api/admin";
+import { consultationPatientName, formatDossierNumber, getAdminStats, listAdminConsultations, type AdminStats } from "../../services/api/admin";
 import { listMockAdminConsultations } from "../../services/devPreview/adminMock";
 import type { AdminConsultationListItem } from "../../types/api";
 import type { AdminStackParamList } from "../../navigation/adminTypes";
@@ -44,10 +44,6 @@ function formatRelativeTime(iso: string): string {
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `Il y a ${diffH} h`;
   return `Il y a ${Math.floor(diffH / 24)} j`;
-}
-
-function formatDossierId(item: { refNumber: number; createdAt: string }): string {
-  return `DC-${new Date(item.createdAt).getFullYear()}-${String(item.refNumber).padStart(5, "0")}`;
 }
 
 function formatToday(): string {
@@ -165,7 +161,7 @@ export function AdminDashboardScreen({ navigation }: Props) {
           <Text style={[typography.bodyMuted, { color: colors.textMuted, marginTop: 2 }]} numberOfLines={1}>
             {item.motif ?? "Motif non renseigné"}
           </Text>
-          <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>ID: {formatDossierId(item)}</Text>
+          <Text style={[typography.caption, { color: colors.textMuted, marginTop: 2 }]}>N°{formatDossierNumber(item.refNumber)}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>

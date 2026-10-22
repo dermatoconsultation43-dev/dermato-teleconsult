@@ -15,6 +15,23 @@ const consultationInclude = {
   appointment: true,
 } as const;
 
+// La conclusion médicale (voir admin.service.ts#saveConsultationConclusion) est un
+// champ strictement interne à l'équipe admin — jamais renvoyé au patient. Prisma
+// renvoie toutes les colonnes scalaires par défaut avec `include` (contrairement à
+// `select`), donc chaque réponse patient doit explicitement les retirer ici plutôt
+// que de compter sur l'app mobile pour simplement ne pas les afficher.
+function omitAdminOnlyFields<
+  T extends {
+    conclusionMedicale?: unknown;
+    conclusionSavedAt?: unknown;
+    conclusionDriveFileId?: unknown;
+    conclusionSavedByAdminId?: unknown;
+  },
+>(consultation: T): Omit<T, "conclusionMedicale" | "conclusionSavedAt" | "conclusionDriveFileId" | "conclusionSavedByAdminId"> {
+  const { conclusionMedicale, conclusionSavedAt, conclusionDriveFileId, conclusionSavedByAdminId, ...rest } = consultation;
+  return rest;
+}
+
 async function assertOwnedDraft(consultationId: string, patientId: string) {
   const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
   if (!consultation) throw new NotFoundError("Consultation introuvable.");
@@ -93,14 +110,14 @@ export async function upsertDraft(patientId: string, clientUuid: string, input: 
     return tx.consultation.findUniqueOrThrow({ where: { id: saved.id }, include: consultationInclude });
   });
 
-  return consultation;
+  return omitAdminOnlyFields(consultation);
 }
 
 export async function getConsultation(patientId: string, id: string) {
   const consultation = await prisma.consultation.findUnique({ where: { id }, include: consultationInclude });
   if (!consultation || consultation.deletedAt) throw new NotFoundError("Consultation introuvable.");
   if (consultation.patientId !== patientId) throw new ForbiddenError();
-  return consultation;
+  return omitAdminOnlyFields(consultation);
 }
 
 export async function listConsultations(
@@ -131,7 +148,7 @@ export async function listConsultations(
     ),
   );
 
-  return items.map((item, i) => ({ ...item, unreadMessagesCount: unreadCounts[i] }));
+  return items.map((item, i) => omitAdminOnlyFields({ ...item, unreadMessagesCount: unreadCounts[i] }));
 }
 
 // Le consentement ne peut être enregistré tant que le dossier n'est pas déjà un
@@ -274,5 +291,5 @@ export async function submitConsultation(patientId: string, id: string) {
     logger.error({ err: error, consultationId: id }, "Échec de la génération/envoi du rapport PDF");
   }
 
-  return updated;
+  return omitAdminOnlyFields(updated);
 }

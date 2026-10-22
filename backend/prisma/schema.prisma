@@ -130,6 +130,7 @@ model AdminUser {
   statusChanges       StatusHistory[] @relation("AdminStatusChanges")
   messages            Message[]       @relation("AdminMessages")
   walkInPatients      Patient[]
+  consultationConclusionsSaved Consultation[] @relation("ConsultationConclusionSavedBy")
 
   @@map("admin_users")
 }
@@ -201,6 +202,17 @@ model Consultation {
 
   // Étape 10 — photos
   photosQualiteConfirmee Boolean? @map("photos_qualite_confirmee")
+
+  // Conclusion médicale rédigée par l'admin après examen du dossier — champ
+  // strictement interne (jamais renvoyé/affiché côté patient, voir consultations
+  // routes/schemas qui n'exposent jamais ce champ à l'app patient). Archivée en PDF
+  // dans un dossier Drive dédié (GOOGLE_DRIVE_RESPONSES_FOLDER_ID, distinct de celui
+  // des photos/dossier patient) à chaque enregistrement — voir services/pdfReport.ts.
+  conclusionMedicale      String?   @map("conclusion_medicale")
+  conclusionSavedAt       DateTime? @map("conclusion_saved_at")
+  conclusionDriveFileId   String?   @map("conclusion_drive_file_id")
+  conclusionSavedByAdminId String?  @map("conclusion_saved_by_admin_id") @db.Uuid
+  conclusionSavedByAdmin  AdminUser? @relation("ConsultationConclusionSavedBy", fields: [conclusionSavedByAdminId], references: [id])
 
   submittedAt DateTime? @map("submitted_at")
   createdAt   DateTime  @default(now()) @map("created_at")

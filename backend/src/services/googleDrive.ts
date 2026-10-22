@@ -63,6 +63,13 @@ export async function getPhotoMetadata(fileId: string): Promise<{ exists: boolea
 }
 
 export async function deletePhotoFromDrive(fileId: string): Promise<void> {
+  return deleteDriveFile(fileId);
+}
+
+// Suppression générique (pas de logique propre aux photos) — utilisée aussi par
+// pdfReport.ts pour remplacer un ancien PDF de conclusion médicale quand l'admin
+// enregistre une nouvelle version (voir uploadConclusionPdfToDrive).
+export async function deleteDriveFile(fileId: string): Promise<void> {
   try {
     await drive.files.delete({ fileId });
   } catch (error) {

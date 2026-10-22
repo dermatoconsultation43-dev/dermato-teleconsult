@@ -1,6 +1,8 @@
 import PDFDocument from "pdfkit";
 import { drive } from "./googleAuth.js";
 import { env } from "../config/env.js";
+import { deleteDriveFile } from "./googleDrive.js";
+import { logger } from "../lib/logger.js";
 import type { Prisma } from "@prisma/client";
 
 // Le dossier Drive ne contenait jusqu'ici que des photos brutes nommées par id
@@ -38,12 +40,16 @@ const BODY_ZONE_LABELS: Record<string, string> = {
   cou: "Cou",
   torse: "Torse (avant)",
   dos: "Dos",
-  bras_droit: "Bras droit",
-  bras_gauche: "Bras gauche",
+  bras_droit: "Bras droit (haut)",
+  bras_gauche: "Bras gauche (haut)",
+  avant_bras_droit: "Avant-bras droit",
+  avant_bras_gauche: "Avant-bras gauche",
   main_droite: "Main droite",
   main_gauche: "Main gauche",
-  jambe_droite: "Jambe droite",
-  jambe_gauche: "Jambe gauche",
+  cuisse_droite: "Cuisse droite",
+  cuisse_gauche: "Cuisse gauche",
+  jambe_droite: "Jambe droite (bas)",
+  jambe_gauche: "Jambe gauche (bas)",
   pied_droit: "Pied droit",
   pied_gauche: "Pied gauche",
 };
@@ -261,6 +267,73 @@ export async function uploadReportPdfToDrive(buffer: Buffer, fileName: string): 
   });
   if (!response.data.id) {
     throw new Error("Google Drive n'a pas renvoyé d'id de fichier après l'envoi du rapport PDF.");
+  }
+  return { fileId: response.data.id };
+}
+
+// ---------- Conclusion médicale (admin) ----------
+//
+// Document séparé du rapport patient ci-dessus : rédigé par l'admin après examen
+// du dossier, jamais exposé côté patient (voir consultations.schemas.ts — le champ
+// conclusionMedicale n'est renvoyé par aucune route patient), archivé dans un
+// dossier Drive dédié (GOOGLE_DRIVE_RESPONSES_FOLDER_ID) pour que le dermatologue
+// retrouve ses comptes-rendus sans les chercher parmi les photos/dossiers patient.
+
+export function buildConclusionFileName(consultation: { refNumber: number; nomComplet: string | null }): string {
+  const ref = String(consultation.refNumber).padStart(6, "0");
+  const nom = sanitizeFileNamePart(consultation.nomComplet?.trim() || "Sans nom", 40);
+  return `${ref} - ${nom} - reponse.pdf`;
+}
+
+export function generateConclusionPdf(
+  consultation: { refNumber: number; nomComplet: string | null },
+  conclusion: string,
+  adminName: string,
+): Promise<Buffer> {
+  const doc = new PDFDocument({ margin: 50, size: "A4" });
+  const chunks: Buffer[] = [];
+  doc.on("data", (chunk) => chunks.push(chunk));
+  const done = new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
+
+  const ref = String(consultation.refNumber).padStart(6, "0");
+  doc.fontSize(18).fillColor("#0A5148").text("DermaConsult — Conclusion médicale");
+  doc.moveDown(0.2);
+  doc.fontSize(11).fillColor("#55655D").text(`Dossier n°${ref} — ${consultation.nomComplet?.trim() || "Sans nom"}`);
+  doc.text(`Rédigée par ${adminName} le ${new Date().toLocaleString("fr-FR")}`);
+  doc.moveDown();
+  doc.strokeColor("#DCE3DE").moveTo(40, doc.y).lineTo(555, doc.y).stroke();
+  doc.moveDown();
+  doc.fontSize(12).fillColor("#16211D").text(conclusion, { align: "left" });
+
+  doc.end();
+  return done;
+}
+
+// Remplace l'ancien PDF de conclusion (previousFileId) si l'admin corrige/complète
+// sa réponse — évite d'accumuler des doublons dans le dossier Drive à chaque
+// enregistrement du même dossier.
+export async function uploadConclusionPdfToDrive(
+  buffer: Buffer,
+  fileName: string,
+  previousFileId?: string | null,
+): Promise<{ fileId: string }> {
+  // Nouveau PDF envoyé AVANT de supprimer l'ancien : si l'envoi échoue, l'ancienne
+  // version reste en place au lieu de laisser le dossier Drive sans aucune réponse.
+  const { Readable } = await import("node:stream");
+  const response = await drive.files.create({
+    requestBody: { name: fileName, parents: [env.GOOGLE_DRIVE_RESPONSES_FOLDER_ID] },
+    media: { mimeType: "application/pdf", body: Readable.from(buffer) },
+    fields: "id",
+  });
+  if (!response.data.id) {
+    throw new Error("Google Drive n'a pas renvoyé d'id de fichier après l'envoi de la conclusion médicale.");
+  }
+  if (previousFileId) {
+    // Un doublon dans Drive vaut mieux qu'un échec de l'enregistrement : le nouveau
+    // PDF est déjà déposé et c'est son id qui sera conservé en base.
+    await deleteDriveFile(previousFileId).catch((error) =>
+      logger.warn({ err: error, previousFileId }, "Ancien PDF de conclusion non supprimé de Drive"),
+    );
   }
   return { fileId: response.data.id };
 }

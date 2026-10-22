@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Circle, Ellipse, Rect, Svg } from "react-native-svg";
+import { Circle, Ellipse, Line, Rect, Svg, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../theme/useTheme";
 
 // Schéma corporel simplifié (pas anatomiquement précis, juste assez lisible pour
@@ -13,12 +13,16 @@ export const BODY_ZONE_LABELS: Record<string, string> = {
   cou: "Cou",
   torse: "Torse (avant)",
   dos: "Dos",
-  bras_droit: "Bras droit",
-  bras_gauche: "Bras gauche",
+  bras_droit: "Bras droit (haut)",
+  bras_gauche: "Bras gauche (haut)",
+  avant_bras_droit: "Avant-bras droit",
+  avant_bras_gauche: "Avant-bras gauche",
   main_droite: "Main droite",
   main_gauche: "Main gauche",
-  jambe_droite: "Jambe droite",
-  jambe_gauche: "Jambe gauche",
+  cuisse_droite: "Cuisse droite",
+  cuisse_gauche: "Cuisse gauche",
+  jambe_droite: "Jambe droite (bas)",
+  jambe_gauche: "Jambe gauche (bas)",
   pied_droit: "Pied droit",
   pied_gauche: "Pied gauche",
 };
@@ -34,12 +38,16 @@ const FRONT_SHAPES: ShapeDef[] = [
   { code: "tete", kind: "circle", cx: 100, cy: 30, r: 22 },
   { code: "cou", kind: "rect", x: 90, y: 50, width: 20, height: 14, rx: 6 },
   { code: "torse", kind: "rect", x: 62, y: 62, width: 76, height: 100, rx: 20 },
-  { code: "bras_droit", kind: "rect", x: 30, y: 66, width: 26, height: 100, rx: 13 },
-  { code: "bras_gauche", kind: "rect", x: 144, y: 66, width: 26, height: 100, rx: 13 },
+  { code: "bras_droit", kind: "rect", x: 30, y: 66, width: 26, height: 48, rx: 13 },
+  { code: "avant_bras_droit", kind: "rect", x: 32, y: 114, width: 22, height: 52, rx: 11 },
+  { code: "bras_gauche", kind: "rect", x: 144, y: 66, width: 26, height: 48, rx: 13 },
+  { code: "avant_bras_gauche", kind: "rect", x: 146, y: 114, width: 22, height: 52, rx: 11 },
   { code: "main_droite", kind: "ellipse", cx: 43, cy: 178, rx: 16, ry: 18 },
   { code: "main_gauche", kind: "ellipse", cx: 157, cy: 178, rx: 16, ry: 18 },
-  { code: "jambe_droite", kind: "rect", x: 64, y: 162, width: 32, height: 140, rx: 16 },
-  { code: "jambe_gauche", kind: "rect", x: 104, y: 162, width: 32, height: 140, rx: 16 },
+  { code: "cuisse_droite", kind: "rect", x: 64, y: 162, width: 32, height: 68, rx: 16 },
+  { code: "jambe_droite", kind: "rect", x: 67, y: 230, width: 26, height: 72, rx: 13 },
+  { code: "cuisse_gauche", kind: "rect", x: 104, y: 162, width: 32, height: 68, rx: 16 },
+  { code: "jambe_gauche", kind: "rect", x: 107, y: 230, width: 26, height: 72, rx: 13 },
   { code: "pied_droit", kind: "ellipse", cx: 80, cy: 320, rx: 20, ry: 14 },
   { code: "pied_gauche", kind: "ellipse", cx: 120, cy: 320, rx: 20, ry: 14 },
 ];
@@ -51,12 +59,16 @@ const BACK_SHAPES: ShapeDef[] = [
   { code: "tete", kind: "circle", cx: 100, cy: 30, r: 22 },
   { code: "cou", kind: "rect", x: 90, y: 50, width: 20, height: 14, rx: 6 },
   { code: "dos", kind: "rect", x: 62, y: 62, width: 76, height: 100, rx: 20 },
-  { code: "bras_gauche", kind: "rect", x: 30, y: 66, width: 26, height: 100, rx: 13 },
-  { code: "bras_droit", kind: "rect", x: 144, y: 66, width: 26, height: 100, rx: 13 },
+  { code: "bras_gauche", kind: "rect", x: 30, y: 66, width: 26, height: 48, rx: 13 },
+  { code: "avant_bras_gauche", kind: "rect", x: 32, y: 114, width: 22, height: 52, rx: 11 },
+  { code: "bras_droit", kind: "rect", x: 144, y: 66, width: 26, height: 48, rx: 13 },
+  { code: "avant_bras_droit", kind: "rect", x: 146, y: 114, width: 22, height: 52, rx: 11 },
   { code: "main_gauche", kind: "ellipse", cx: 43, cy: 178, rx: 16, ry: 18 },
   { code: "main_droite", kind: "ellipse", cx: 157, cy: 178, rx: 16, ry: 18 },
-  { code: "jambe_gauche", kind: "rect", x: 64, y: 162, width: 32, height: 140, rx: 16 },
-  { code: "jambe_droite", kind: "rect", x: 104, y: 162, width: 32, height: 140, rx: 16 },
+  { code: "cuisse_gauche", kind: "rect", x: 64, y: 162, width: 32, height: 68, rx: 16 },
+  { code: "jambe_gauche", kind: "rect", x: 67, y: 230, width: 26, height: 72, rx: 13 },
+  { code: "cuisse_droite", kind: "rect", x: 104, y: 162, width: 32, height: 68, rx: 16 },
+  { code: "jambe_droite", kind: "rect", x: 107, y: 230, width: 26, height: 72, rx: 13 },
   { code: "pied_gauche", kind: "ellipse", cx: 80, cy: 320, rx: 20, ry: 14 },
   { code: "pied_droit", kind: "ellipse", cx: 120, cy: 320, rx: 20, ry: 14 },
 ];
@@ -133,6 +145,21 @@ export function BodyMap({ selected, onChange }: BodyMapProps) {
                 <Rect key={shape.code} {...common} x={shape.x} y={shape.y} width={shape.width} height={shape.height} rx={shape.rx} />
               );
             })}
+            {/* Repères purement décoratifs (pas de zone tactile associée) pour que la
+                vue de dos soit visuellement distincte de la vue de face au premier
+                coup d'œil — sinon les deux silhouettes sont identiques hors torse/dos
+                et le changement d'onglet paraît ne "rien faire". */}
+            {view === "front" ? (
+              <>
+                <Circle cx={92} cy={27} r={2.2} fill={colors.textMuted} />
+                <Circle cx={108} cy={27} r={2.2} fill={colors.textMuted} />
+              </>
+            ) : (
+              <Line x1={100} y1={68} x2={100} y2={156} stroke={colors.border} strokeWidth={1.5} />
+            )}
+            <SvgText x={100} y={343} fontSize={12} fontWeight="600" fill={colors.textMuted} textAnchor="middle">
+              {view === "front" ? "VUE DE FACE" : "VUE DE DOS"}
+            </SvgText>
           </Svg>
           {/* Zones tactiles en calques RN plutôt qu'un onPress posé directement sur les
               formes SVG : peu fiable avec la New Architecture (Fabric) — le "bonhomme"

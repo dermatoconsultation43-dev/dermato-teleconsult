@@ -9,7 +9,7 @@ import { TextField } from "../../components/TextField";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useTheme } from "../../theme/useTheme";
 import { useAuthStore } from "../../store/authStore";
-import { consultationPatientName, consultationPatientPhone, listAdminConsultations } from "../../services/api/admin";
+import { consultationPatientName, consultationPatientPhone, formatDossierNumber, listAdminConsultations } from "../../services/api/admin";
 import { listMockAdminConsultations } from "../../services/devPreview/adminMock";
 import type { AdminConsultationListItem, ConsultationStatus } from "../../types/api";
 import type { AdminStackParamList } from "../../navigation/adminTypes";
@@ -76,7 +76,7 @@ export function AdminConsultationsListScreen({ navigation, route }: Props) {
                 {item.motif ?? "Motif non renseigné"}
               </Text>
               <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
-                Dossier n°{String(item.refNumber).padStart(6, "0")} · {consultationPatientPhone(item)}
+                Dossier n°{formatDossierNumber(item.refNumber)} · {consultationPatientPhone(item)}
               </Text>
             </View>
             <StatusBadge status={item.status} />

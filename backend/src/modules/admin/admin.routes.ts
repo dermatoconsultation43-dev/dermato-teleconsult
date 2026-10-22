@@ -8,6 +8,7 @@ import {
   deleteConsultationSchema,
   listAdminConsultationsQuerySchema,
   photoIdParamsSchema,
+  saveConclusionSchema,
   updateAppointmentSchema,
 } from "./admin.schemas.js";
 import { consultationDraftSchema } from "../consultations/consultations.schemas.js";
@@ -20,6 +21,7 @@ import {
   getAdminStats,
   listAdminConsultations,
   listAdminMessages,
+  saveConsultationConclusion,
   sendAdminMessage,
   updateAppointment,
   updateConsultationFields,
@@ -152,6 +154,21 @@ adminRouter.patch(
     try {
       const appointment = await updateAppointment(req.params.id, req.body, req.auth!.admin!.id);
       res.json(appointment);
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+
+// Conclusion médicale interne (jamais exposée côté patient) — voir
+// admin.service.ts#saveConsultationConclusion.
+adminRouter.put(
+  "/consultations/:id/conclusion",
+  validate({ params: consultationIdParamsSchema, body: saveConclusionSchema }),
+  async (req, res, next) => {
+    try {
+      const consultation = await saveConsultationConclusion(req.params.id, req.body.conclusion, req.auth!.admin!.id);
+      res.json(consultation);
     } catch (error) {
       next(error);
     }

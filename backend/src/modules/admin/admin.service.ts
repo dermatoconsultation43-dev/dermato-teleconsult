@@ -5,6 +5,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../../lib/errors.
 import { logger } from "../../lib/logger.js";
 import { streamPhotoFromDrive } from "../../services/googleDrive.js";
 import { updateConsultationStatusInSheet } from "../../services/googleSheets.js";
+import { buildConclusionFileName, generateConclusionPdf, uploadConclusionPdfToDrive } from "../../services/pdfReport.js";
 import type { ConsultationDraftInput } from "../consultations/consultations.schemas.js";
 
 const detailInclude = {
@@ -91,9 +92,9 @@ export async function getAdminStats() {
 
   const [participants, pending, completed, today] = await Promise.all([
     prisma.patient.count(),
-    prisma.consultation.count({ where: { status: "pending" } }),
-    prisma.consultation.count({ where: { status: "completed" } }),
-    prisma.consultation.count({ where: { createdAt: { gte: startOfToday } } }),
+    prisma.consultation.count({ where: { status: "pending", deletedAt: null } }),
+    prisma.consultation.count({ where: { status: "completed", deletedAt: null } }),
+    prisma.consultation.count({ where: { createdAt: { gte: startOfToday }, deletedAt: null } }),
   ]);
 
   return { participants, pending, completed, today };
@@ -417,5 +418,40 @@ export async function updateAppointment(
       },
       include: { availability: true, createdByAdmin: { select: { nom: true, prenom: true } } },
     });
+  });
+}
+
+// Conclusion médicale rédigée par l'admin après examen du dossier — champ
+// strictement interne (jamais exposé côté patient, voir schema.prisma). Le texte
+// est persisté avant l'envoi vers Drive : si l'upload échoue, la conclusion n'est
+// jamais perdue et l'admin peut réessayer sans tout retaper. L'ancien PDF (s'il y
+// en a un) est remplacé plutôt que dupliqué, voir uploadConclusionPdfToDrive.
+export async function saveConsultationConclusion(consultationId: string, conclusion: string, adminId: string) {
+  const consultation = await prisma.consultation.findUnique({ where: { id: consultationId } });
+  if (!consultation || consultation.deletedAt) throw new NotFoundError("Consultation introuvable.");
+
+  if (consultation.status === ConsultationStatus.draft || consultation.status === ConsultationStatus.pending) {
+    throw new ConflictError(
+      `Impossible d'enregistrer une conclusion pour un dossier au statut "${consultation.status}". ` +
+      `Le dossier doit d'abord être confirmé.`,
+    );
+  }
+
+  await prisma.consultation.update({ where: { id: consultationId }, data: { conclusionMedicale: conclusion } });
+
+  const admin = await prisma.adminUser.findUniqueOrThrow({ where: { id: adminId }, select: { nom: true, prenom: true } });
+  const adminName = `${admin.prenom} ${admin.nom}`.trim();
+
+  const pdfBuffer = await generateConclusionPdf(consultation, conclusion, adminName);
+  const { fileId } = await uploadConclusionPdfToDrive(
+    pdfBuffer,
+    buildConclusionFileName(consultation),
+    consultation.conclusionDriveFileId,
+  );
+
+  return prisma.consultation.update({
+    where: { id: consultationId },
+    data: { conclusionDriveFileId: fileId, conclusionSavedAt: new Date(), conclusionSavedByAdminId: adminId },
+    include: detailInclude,
   });
 }
