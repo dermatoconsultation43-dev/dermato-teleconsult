@@ -32,6 +32,11 @@ const envSchema = z.object({
 
   RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(300),
+  // Quota séparé pour /admin/agent-consultations (voir middleware/rateLimit.ts) :
+  // au retour d'une tournée hors ligne, un seul téléphone rejoue d'un coup ~6
+  // requêtes par dossier (brouillon, consentement, photos, envoi) — 150 dossiers
+  // dépassaient à eux seuls le quota général de 300.
+  AGENT_SYNC_RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(3000),
 
   // Optionnels : tant qu'ils ne sont pas renseignés, l'envoi de SMS est
   // silencieusement désactivé (voir services/sms.ts) plutôt que de bloquer le

@@ -3,6 +3,7 @@ import { recordConsent as recordConsentApi, saveDraft, submitConsultation } from
 import { recordWalkInConsent, saveWalkInDraft, submitWalkInConsultation, uploadWalkInPhoto } from "../api/agent";
 import { uploadPhoto } from "../api/photos";
 import { ApiError } from "../api/client";
+import { requeueInterruptedSyncs } from "./db";
 import { countPendingDrafts, getPendingDrafts, markDraftStatus, removeDraftLocally } from "./draftQueue";
 import {
   countPendingPhotos,
@@ -64,6 +65,7 @@ export function initSyncEngine(): void {
   if (started) return;
   started = true;
 
+  requeueInterruptedSyncs();
   refreshPendingCount();
 
   NetInfo.fetch()

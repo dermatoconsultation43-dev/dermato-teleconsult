@@ -1,5 +1,6 @@
 import { env } from "../../config/env";
 import { getIdToken } from "../auth/firebaseAuth";
+import { useOfflineStore } from "../../store/offlineStore";
 import type { ApiErrorBody } from "../../types/api";
 
 export class ApiError extends Error {
@@ -37,6 +38,29 @@ const REQUEST_TIMEOUT_MS = 70000;
 // et doit lui aussi couvrir un éventuel réveil du service à froid (voir ci-dessus).
 const UPLOAD_TIMEOUT_MS = 90000;
 
+// Le jeton Firebase expire au bout d'~1h : au-delà, getIdToken doit le renouveler
+// auprès de Google, ce qui échoue forcément hors ligne. Cette erreur Firebase
+// brute (pas une ApiError) faisait croire aux écrans à une vraie erreur — un agent
+// terrain sans réseau depuis plus d'une heure était bloqué à chaque étape au lieu
+// de voir son dossier mis en file locale. On la traduit donc en network_error
+// (status 0), le même signal que celui d'un fetch impossible.
+async function requireIdToken(): Promise<string> {
+  let token: string | null;
+  try {
+    token = await getIdToken();
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    if (code === "auth/network-request-failed" || !useOfflineStore.getState().isOnline) {
+      throw new ApiError(0, "network_error", "Impossible de joindre le serveur. Vérifiez votre connexion.");
+    }
+    throw new ApiError(401, "unauthenticated", "Session expirée, reconnectez-vous.");
+  }
+  if (!token) {
+    throw new ApiError(401, "unauthenticated", "Session expirée, reconnectez-vous.");
+  }
+  return token;
+}
+
 // Point d'entrée unique vers l'API : jamais d'URL en dur ailleurs dans l'app, jamais
 // un message d'erreur brut du serveur affiché directement à l'utilisateur (voir
 // mapApiErrorToUserMessage dans chaque écran, qui décide du texte affiché).
@@ -46,11 +70,7 @@ export async function apiRequest<TResponse>(path: string, options: RequestOption
   const headers: Record<string, string> = { "Content-Type": "application/json" };
 
   if (authenticated) {
-    const token = await getIdToken();
-    if (!token) {
-      throw new ApiError(401, "unauthenticated", "Session expirée, reconnectez-vous.");
-    }
-    headers.Authorization = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${await requireIdToken()}`;
   }
 
   const controller = new AbortController();
@@ -93,10 +113,7 @@ export async function apiRequest<TResponse>(path: string, options: RequestOption
 // multipart), le fixer à la main casserait le parsing côté serveur (voir
 // middleware/upload.ts).
 export async function apiUpload<TResponse>(path: string, formData: FormData): Promise<TResponse> {
-  const token = await getIdToken();
-  if (!token) {
-    throw new ApiError(401, "unauthenticated", "Session expirée, reconnectez-vous.");
-  }
+  const token = await requireIdToken();
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);

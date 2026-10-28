@@ -4,7 +4,7 @@ import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import { env } from "./config/env.js";
 import { logger } from "./lib/logger.js";
-import { apiRateLimiter } from "./middleware/rateLimit.js";
+import { agentSyncRateLimiter, apiRateLimiter } from "./middleware/rateLimit.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { healthRouter } from "./modules/health/health.routes.js";
 import { patientsRouter } from "./modules/patients/patients.routes.js";
@@ -54,7 +54,7 @@ export function createApp() {
   // admin via requireAdminRole sur la plupart de ses routes) intercepterait ces
   // requêtes en premier et bloquerait les comptes agent avant même d'atteindre
   // agentConsultationsRouter.
-  app.use("/api/v1/admin/agent-consultations", agentConsultationsRouter);
+  app.use("/api/v1/admin/agent-consultations", agentSyncRateLimiter, agentConsultationsRouter);
   app.use("/api/v1/admin", adminRouter);
 
   app.use(notFoundHandler);

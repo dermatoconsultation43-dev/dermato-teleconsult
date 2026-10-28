@@ -85,7 +85,33 @@ export function getDb(): string {
         updated_at TEXT NOT NULL
       );`,
     );
+    // Dernier profil résolu (patient ou admin/agent) par compte Firebase — voir
+    // profileCache.ts : permet d'ouvrir l'app sans réseau au lieu de rester bloqué
+    // sur "Impossible de joindre le serveur" (RootNavigator#resolveProfile).
+    QuickSQLite.execute(
+      DB_NAME,
+      `CREATE TABLE IF NOT EXISTS profile_cache (
+        firebase_uid TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );`,
+    );
     initialized = true;
   }
   return DB_NAME;
+}
+
+const SYNC_QUEUE_TABLES = ["draft_queue", "photo_queue", "consent_queue", "submit_queue"] as const;
+
+// Un élément reste "syncing" si l'app est tuée en plein envoi (écran verrouillé,
+// Android qui libère la mémoire...) — or les getPending* ne relisent que
+// "pending"/"failed", il n'était donc plus jamais renvoyé. Appelé une fois au
+// démarrage (syncEngine#initSyncEngine), avant tout envoi : à ce moment-là, aucun
+// envoi n'est réellement en cours.
+export function requeueInterruptedSyncs(): void {
+  const db = getDb();
+  for (const table of SYNC_QUEUE_TABLES) {
+    QuickSQLite.execute(db, `UPDATE ${table} SET status = 'pending' WHERE status = 'syncing';`);
+  }
 }

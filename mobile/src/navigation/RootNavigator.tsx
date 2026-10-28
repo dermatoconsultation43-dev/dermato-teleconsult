@@ -5,6 +5,7 @@ import { getCurrentUser, signOut, subscribeToAuthState } from "../services/auth/
 import { getMyProfile } from "../services/api/patients";
 import { getMyAdminProfile } from "../services/api/admin";
 import { ApiError } from "../services/api/client";
+import { clearCachedProfiles, getCachedProfile, saveCachedProfile } from "../services/offline/profileCache";
 import { useAuthStore } from "../store/authStore";
 import { LoadingScreen } from "../screens/LoadingScreen";
 import { AuthErrorScreen } from "../screens/AuthErrorScreen";
@@ -58,9 +59,25 @@ export function RootNavigator() {
         return;
       }
 
+      // Hors ligne (status 0) : on rouvre la session avec le dernier profil connu
+      // pour ce compte (voir services/offline/profileCache.ts) plutôt que de
+      // bloquer sur l'écran d'erreur — un agent dont le téléphone a redémarré en
+      // pleine tournée doit pouvoir continuer à saisir ses dossiers hors ligne.
+      function signInFromCacheOrFail(): void {
+        const cached = getCachedProfile(user.uid);
+        if (cached?.kind === "patient") {
+          setSignedInPatient(cached.profile);
+        } else if (cached?.kind === "admin") {
+          setSignedInAdmin(cached.profile);
+        } else {
+          setError("Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.", user.uid);
+        }
+      }
+
       setLoading();
       try {
         const patient = await getMyProfile();
+        saveCachedProfile(user.uid, { kind: "patient", profile: patient });
         setSignedInPatient(patient);
         return;
       } catch (error) {
@@ -70,21 +87,27 @@ export function RootNavigator() {
         // serveur a échoué. La déconnexion silencieuse ici était le bug : un
         // patient bien connecté se retrouvait renvoyé sur l'écran de connexion
         // sans aucune explication dès que le réseau avait un hoquet.
+        if (error instanceof ApiError && error.status === 0) {
+          signInFromCacheOrFail();
+          return;
+        }
         if (!(error instanceof ApiError) || error.status !== 403) {
-          setError(
-            error instanceof ApiError && error.status === 0
-              ? "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
-              : "Une erreur est survenue. Réessayez.",
-            user.uid,
-          );
+          setError("Une erreur est survenue. Réessayez.", user.uid);
           return;
         }
       }
 
       try {
         const admin = await getMyAdminProfile();
+        saveCachedProfile(user.uid, { kind: "admin", profile: admin });
         setSignedInAdmin(admin);
-      } catch {
+      } catch (error) {
+        // Coupure entre les deux appels : ne pas conclure à tort à un profil
+        // manquant (needsProfile) alors que seul le réseau a lâché.
+        if (error instanceof ApiError && error.status === 0) {
+          signInFromCacheOrFail();
+          return;
+        }
         // Re-vérifié ici (pas seulement en entrée de fonction) : SignUpScreen a pu
         // terminer sa propre création de profil pendant les deux appels ci-dessus
         // et déjà appelé setSignedInPatient() — ne pas régresser vers needsProfile.
@@ -103,6 +126,7 @@ export function RootNavigator() {
   useEffect(() => {
     const unsubscribe = subscribeToAuthState(async (user) => {
       if (!user) {
+        clearCachedProfiles();
         setSignedOut();
         return;
       }
