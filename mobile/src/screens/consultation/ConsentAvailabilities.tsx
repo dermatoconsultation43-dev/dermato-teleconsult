@@ -35,7 +35,7 @@ const CONSENT_TEXT =
 // `id` = le libellé lui-même (pas un vrai UUID de la table Availability, aucun
 // moyen de le connaître hors ligne) : sanitizeDraftAvailabilities (services/api/
 // availabilities.ts) le convertit en texte libre juste avant l'envoi.
-const FALLBACK_AVAILABILITIES: Availability[] = [
+export const FALLBACK_AVAILABILITIES: Availability[] = [
   { id: "Lundi 19h30–20h30", jourSemaine: "lundi", label: "Lundi 19h30–20h30", actif: true },
   { id: "Mardi 19h30–20h30", jourSemaine: "mardi", label: "Mardi 19h30–20h30", actif: true },
   { id: "Mercredi 19h30–20h30", jourSemaine: "mercredi", label: "Mercredi 19h30–20h30", actif: true },
@@ -104,7 +104,7 @@ export function ConsentAvailabilities({ navigation }: Props) {
     setLocalError(null);
 
     if (isDevPreview) {
-      navigation.navigate("Summary");
+      saveAndContinue(() => navigation.navigate("Summary"));
       return;
     }
 

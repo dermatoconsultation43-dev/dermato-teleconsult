@@ -96,7 +96,7 @@ export function AdminConsultationsListScreen({ navigation, route }: Props) {
         <TextField
           label="Rechercher un patient"
           icon="search"
-          placeholder="Nom, prénom ou téléphone"
+          placeholder="Code du patient ou téléphone"
           value={search}
           onChangeText={setSearch}
           returnKeyType="search"

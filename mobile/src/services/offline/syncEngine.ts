@@ -48,7 +48,7 @@ let syncingSubmits = false;
 // résorbe tout seul en arrière-plan.
 const RETRY_INTERVAL_MS = 30000;
 
-function refreshPendingCount(): void {
+export function refreshPendingCount(): void {
   // Un seul compteur affiché (voir OfflineBanner) : la somme des quatre files —
   // peu importe, du point de vue de l'utilisateur, que ce soit du texte, une
   // photo, le consentement ou l'envoi final qui attend encore d'être envoyé.

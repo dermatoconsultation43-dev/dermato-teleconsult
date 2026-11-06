@@ -6,13 +6,14 @@ import { useConsultationDraftStore } from "../../store/consultationDraftStore";
 import { useOfflineStore } from "../../store/offlineStore";
 import { useIsDevPreview } from "../../hooks/useIsDevPreview";
 import { countPendingDrafts, saveDraftLocally } from "../../services/offline/draftQueue";
+import { useSummaryReturn } from "./useSummaryReturn";
 
 // Traduit les noms de champs du schéma backend (voir consultations.schemas.ts)
 // en libellés lisibles, pour transformer le détail zod (`error.details.fieldErrors`)
 // en message exploitable — le message générique du serveur ("Corps de requête
 // invalide.") ne dit jamais quel champ poser problème.
 const FIELD_LABELS: Record<string, string> = {
-  nomComplet: "Nom complet",
+  nomComplet: "Code du patient ou nom",
   sexe: "Sexe",
   statutMatrimonial: "Statut matrimonial",
   age: "Âge",
@@ -78,10 +79,12 @@ export function useSaveDraftStep() {
   const setDraftStatus = useOfflineStore((s) => s.setDraftStatus);
   const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const isDevPreview = useIsDevPreview();
+  const { fromSummary, returnToSummary } = useSummaryReturn();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function saveAndContinue(onSuccess: () => void) {
+  async function saveAndContinue(onContinue: () => void) {
+    const onSuccess = fromSummary ? returnToSummary : onContinue;
     // Mode aperçu dev (voir LoginScreen) : aucun compte Firebase réel, donc aucun
     // appel API possible — on avance directement pour permettre de parcourir tout le
     // formulaire hors ligne.

@@ -36,7 +36,7 @@ const LESION_IMAGES: Record<string, ReturnType<typeof require>> = {
 // (voir LoginScreen, aucun appel serveur possible), mais aussi de repli hors ligne :
 // un agent terrain sans connexion doit pouvoir choisir un aspect de lésion même si
 // /lesion-types n'a jamais pu être chargé sur cet appareil (voir plus bas, `items`).
-const FALLBACK_LESION_TYPES: LesionTypeOption[] = [
+export const FALLBACK_LESION_TYPES: LesionTypeOption[] = [
   { code: "tache", labelFr: "Taches", description: "Zone de peau dont la couleur diffère, sans relief.", displayOrder: 1 },
   { code: "papule", labelFr: "Papules", description: "Petites lésions solides en relief.", displayOrder: 2 },
   { code: "plaque", labelFr: "Plaques", description: "Lésions plus larges, en relief ou non.", displayOrder: 3 },

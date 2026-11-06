@@ -34,7 +34,7 @@ export function AgentNewConsultationStart({ navigation }: Props) {
 
   function handleStart() {
     if (!nomComplet.trim()) {
-      setError("Le nom complet est requis.");
+      setError("Le code du patient est requis.");
       return;
     }
     setError(null);
@@ -122,8 +122,8 @@ export function AgentNewConsultationStart({ navigation }: Props) {
           </View>
           <View style={{ flex: 1, marginLeft: spacing.md }}>
             <TextField
-              label="Nom complet *"
-              placeholder="Saisissez le nom complet"
+              label="Code du patient *"
+              placeholder="Saisissez le code du patient"
               value={nomComplet}
               onChangeText={setNomComplet}
             />

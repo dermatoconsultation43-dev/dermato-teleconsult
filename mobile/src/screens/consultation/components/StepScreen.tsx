@@ -5,6 +5,7 @@ import { ProgressStep } from "../../../components/ProgressStep";
 import { Button } from "../../../components/Button";
 import { Icon, IconName } from "../../../components/icons/Icon";
 import { useTheme } from "../../../theme/useTheme";
+import { useSummaryReturn } from "../useSummaryReturn";
 
 interface StepScreenProps {
   step: number;
@@ -41,6 +42,8 @@ export function StepScreen({
   children,
 }: PropsWithChildren<StepScreenProps>) {
   const { colors, spacing, radius, typography } = useTheme();
+  const { fromSummary, returnToSummary } = useSummaryReturn();
+  const backAction = fromSummary ? returnToSummary : onBack;
 
   return (
     <ScreenContainer>
@@ -74,8 +77,8 @@ export function StepScreen({
       ) : null}
 
       <View style={{ gap: spacing.md, marginTop: spacing.md }}>
-        <Button label={continueLabel} onPress={onContinue} disabled={!canContinue} loading={saving} />
-        {onBack ? <Button label="Retour" variant="ghost" onPress={onBack} /> : null}
+        <Button label={fromSummary ? "Enregistrer et revenir au résumé" : continueLabel} onPress={onContinue} disabled={!canContinue} loading={saving} />
+        {backAction ? <Button label="Retour" variant="ghost" onPress={backAction} /> : null}
       </View>
     </ScreenContainer>
   );

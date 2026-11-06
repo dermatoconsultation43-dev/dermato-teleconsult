@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Card } from "../../components/Card";
 import { OfflineBanner } from "../../components/OfflineBanner";
+import { SyncCard } from "../../components/SyncCard";
 import { Icon, IconName } from "../../components/icons/Icon";
 import { StatusBadge } from "../../components/StatusBadge";
 import { useTheme } from "../../theme/useTheme";
@@ -268,7 +269,11 @@ export function AdminDashboardScreen({ navigation }: Props) {
             </View>
           </View>
 
-          <View style={[styles.statsGrid, { marginTop: spacing.xl }]}>
+          <View style={{ marginTop: spacing.xl }}>
+            <SyncCard />
+          </View>
+
+          <View style={[styles.statsGrid, { marginTop: spacing.md }]}>
             {stats.map((stat) => {
               const iconBg = stat.tint === "warn" ? colors.warnSoft : colors.accentSoft;
               const iconFg = stat.tint === "warn" ? colors.warn : colors.accentStrong;

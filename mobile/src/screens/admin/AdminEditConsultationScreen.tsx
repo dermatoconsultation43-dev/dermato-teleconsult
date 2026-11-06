@@ -213,7 +213,7 @@ export function AdminEditConsultationScreen({ route, navigation }: Props) {
       </Text>
 
       <Text style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>Informations personnelles</Text>
-      <TextField label="Nom complet" value={form.nomComplet ?? ""} onChangeText={(v) => patch({ nomComplet: v })} />
+      <TextField label="Code du patient" value={form.nomComplet ?? ""} onChangeText={(v) => patch({ nomComplet: v })} />
       <Text style={label}>Sexe</Text>
       <ChoiceGroup
         options={[

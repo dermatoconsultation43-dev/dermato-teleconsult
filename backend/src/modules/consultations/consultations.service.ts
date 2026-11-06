@@ -174,7 +174,7 @@ export async function recordConsent(
 }
 
 const REQUIRED_DRAFT_FIELDS: Array<{ field: keyof ConsultationDraftInput; label: string }> = [
-  { field: "nomComplet", label: "Nom complet" },
+  { field: "nomComplet", label: "Code du patient ou nom" },
   { field: "sexe", label: "Sexe" },
   { field: "age", label: "Âge" },
   // Téléphone facultatif : beaucoup de personnes vues sur le terrain n'en ont pas.

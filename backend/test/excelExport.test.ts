@@ -116,7 +116,7 @@ describe("Export Excel des dossiers", () => {
     ]);
     const { cell } = await readBack(await buildConsultationsWorkbook());
     expect(cell("Saisi par")).toBe("Patient (appli)");
-    expect(cell("Nom complet")).toBe("Moussa Ba");
+    expect(cell("Code du patient")).toBe("Moussa Ba");
     expect(cell("Téléphone")).toBe("+221771111111");
   });
 });

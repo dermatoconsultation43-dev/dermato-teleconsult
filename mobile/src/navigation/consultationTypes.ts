@@ -4,13 +4,15 @@ import type { ConsultationMode } from "../store/consultationDraftStore";
 // usage terrain où l'on remplit beaucoup de dossiers à la suite : moins d'écrans à
 // enchaîner, chaque étape regroupant les questions qui se répondent ensemble
 // naturellement (voir StepXxx.tsx pour le détail de chaque regroupement).
+type StepParams = { fromSummary?: boolean } | undefined;
+
 export type ConsultationStackParamList = {
-  Step1PersonalInfo: undefined;
-  Step2Problem: undefined;
-  Step3LesionAspect: undefined;
-  Step4Context: undefined;
-  Photos: undefined;
-  ConsentAvailabilities: undefined;
+  Step1PersonalInfo: StepParams;
+  Step2Problem: StepParams;
+  Step3LesionAspect: StepParams;
+  Step4Context: StepParams;
+  Photos: StepParams;
+  ConsentAvailabilities: StepParams;
   Summary: undefined;
   // `mode` est transmis explicitement ici plutôt que relu depuis
   // consultationDraftStore côté ConfirmationScreen : SummaryScreen appelle

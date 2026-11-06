@@ -444,7 +444,7 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
 
       <Card style={{ marginTop: spacing.lg }}>
         <Text style={[typography.h2, { color: colors.text, marginBottom: spacing.md }]}>Patient</Text>
-        <InfoRow label="Nom complet (dossier)" value={consultation.nomComplet} />
+        <InfoRow label="Code du patient" value={consultation.nomComplet} />
         <InfoRow label="Nom du compte" value={`${consultation.patient.prenom} ${consultation.patient.nom}`} />
         <InfoRow label="Téléphone" value={consultation.patient.telephone} />
         <InfoRow label="Email" value={consultation.patient.email} />

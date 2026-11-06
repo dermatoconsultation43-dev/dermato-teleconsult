@@ -96,7 +96,7 @@ const COLUMNS: ExportColumn[] = [
         ? `Agent : ${`${c.patient.createdByAdmin.prenom} ${c.patient.createdByAdmin.nom}`.trim()}`
         : "Patient (appli)",
   },
-  { header: "Nom complet", width: 24, value: (c) => c.nomComplet ?? (`${c.patient.prenom} ${c.patient.nom}`.trim() || null) },
+  { header: "Code du patient", width: 24, value: (c) => c.nomComplet ?? (`${c.patient.prenom} ${c.patient.nom}`.trim() || null) },
   { header: "Sexe", width: 6, value: (c) => c.sexe },
   { header: "Statut matrimonial", width: 16, value: (c) => enumLabel(c.statutMatrimonial) },
   { header: "Âge", width: 6, value: (c) => c.age },

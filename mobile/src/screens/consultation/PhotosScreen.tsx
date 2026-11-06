@@ -8,6 +8,7 @@ import { Button } from "../../components/Button";
 import { ChoiceGroup } from "../../components/ChoiceGroup";
 import { Icon } from "../../components/icons/Icon";
 import { useTheme } from "../../theme/useTheme";
+import { useSummaryReturn } from "./useSummaryReturn";
 import { useConsultationDraftStore, type LocalPhoto } from "../../store/consultationDraftStore";
 import { useOfflineStore } from "../../store/offlineStore";
 import { useIsDevPreview } from "../../hooks/useIsDevPreview";
@@ -166,13 +167,16 @@ export function PhotosScreen({ navigation }: Props) {
   const hasAnyPhoto = photos.some((p) => p.status === "uploaded" || p.status === "queued" || p.status === "uploading");
   const canContinue = !hasAnyPhoto || draft.photosQualiteConfirmee === true;
 
+  const { fromSummary, returnToSummary } = useSummaryReturn();
+
   function handleContinue() {
     if (hasAnyPhoto && draft.photosQualiteConfirmee !== true) {
       setStepError("Confirmez que vos photos sont nettes et de bonne qualité avant de continuer.");
       return;
     }
     setStepError(null);
-    navigation.navigate("ConsentAvailabilities");
+    if (fromSummary) returnToSummary();
+    else navigation.navigate("ConsentAvailabilities");
   }
 
   return (

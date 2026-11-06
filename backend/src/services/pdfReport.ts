@@ -166,7 +166,7 @@ export async function generateConsultationReportPdf(
   }
 
   section("Informations personnelles");
-  row("Nom complet", val(consultation.nomComplet));
+  row("Code du patient", val(consultation.nomComplet));
   row("Sexe", consultation.sexe ? (SEXE_LABELS[consultation.sexe] ?? consultation.sexe) : "—");
   row("Statut matrimonial", consultation.statutMatrimonial ? (STATUT_LABELS[consultation.statutMatrimonial] ?? consultation.statutMatrimonial) : "—");
   row("Âge", val(consultation.age));

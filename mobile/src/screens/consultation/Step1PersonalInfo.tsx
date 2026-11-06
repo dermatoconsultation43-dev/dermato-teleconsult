@@ -39,6 +39,8 @@ export const STATUT_OPTIONS = [
 
 export function Step1PersonalInfo({ navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
+  const mode = useConsultationDraftStore((s) => s.mode);
+  const identityLabel = mode === "agent" ? "Code du patient" : "Nom complet";
   const draft = useConsultationDraftStore((s) => s.draft);
   const updateDraft = useConsultationDraftStore((s) => s.updateDraft);
   const { saveAndContinue, saving, error } = useSaveDraftStep();
@@ -61,8 +63,8 @@ export function Step1PersonalInfo({ navigation }: Props) {
     if (!draft.nomComplet || !draft.sexe || !draft.age || (hasPhone && draft.confirmationWhatsapp === undefined)) {
       setLocalError(
         hasPhone
-          ? "Nom complet, sexe, âge et confirmation par WhatsApp sont requis."
-          : "Nom complet, sexe et âge sont requis.",
+          ? `${identityLabel}, sexe, âge et confirmation par WhatsApp sont requis.`
+          : `${identityLabel}, sexe et âge sont requis.`,
       );
       return;
     }
@@ -82,7 +84,7 @@ export function Step1PersonalInfo({ navigation }: Props) {
       error={localError ?? error}
     >
       <TextField
-        label="Nom complet *"
+        label={`${identityLabel} *`}
         value={draft.nomComplet ?? ""}
         onChangeText={(v) => updateDraft({ nomComplet: v })}
         style={{ marginBottom: spacing.xl }}

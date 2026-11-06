@@ -59,7 +59,7 @@ export async function createOrUpdateWalkInDraft(adminId: string, clientUuid: str
     }
   } else {
     if (!input.nomComplet) {
-      throw new ValidationError("Le nom complet est requis pour créer un dossier.");
+      throw new ValidationError("Le code du patient est requis pour créer un dossier.");
     }
     const { prenom, nom } = splitFullName(input.nomComplet);
 
