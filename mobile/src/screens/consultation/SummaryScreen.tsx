@@ -22,13 +22,11 @@ import { FALLBACK_AVAILABILITIES } from "./ConsentAvailabilities";
 import { isoDateToFr, STATUT_OPTIONS } from "./Step1PersonalInfo";
 import { FALLBACK_LESION_TYPES } from "./Step3LesionAspect";
 import type { ConsultationStackParamList } from "../../navigation/consultationTypes";
-import type { Availability, PhotoSlot } from "../../types/api";
+import type { Availability } from "../../types/api";
 
 type Props = NativeStackScreenProps<ConsultationStackParamList, "Summary">;
 
 const DUREE_UNITE_LABELS: Record<string, string> = { jours: "jour(s)", semaines: "semaine(s)", mois: "mois", annees: "année(s)" };
-const REQUIRED_PHOTO_SLOTS: PhotoSlot[] = ["vue_generale", "vue_rapprochee"];
-
 function yesNo(value: boolean | undefined): string | undefined {
   return value === undefined ? undefined : value ? "Oui" : "Non";
 }
@@ -85,10 +83,7 @@ export function SummaryScreen({ navigation }: Props) {
   // "pas encore prête", pour choisir entre envoi immédiat et mise en file (voir
   // handleSubmit) — jamais pour bloquer le bouton : un agent terrain doit pouvoir
   // enchaîner ses dossiers sans connexion du tout, sur toute une tournée.
-  const pendingPhotoSlots = photos
-    .filter((p) => REQUIRED_PHOTO_SLOTS.includes(p.slot) && p.status !== "uploaded")
-    .map((p) => p.slot);
-  const canSubmitNow = isOnline && pendingPhotoSlots.length === 0;
+  const canSubmitNow = isOnline && photos.every((p) => p.status === "uploaded");
 
   function Section({
     title,

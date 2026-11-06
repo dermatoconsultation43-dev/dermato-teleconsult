@@ -3,16 +3,15 @@ import { Text } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { Button } from "./Button";
 import { Card } from "./Card";
-import { useManualSync } from "../hooks/useManualSync";
 import { refreshPendingCount } from "../services/offline/syncEngine";
+import { useOfflineStore } from "../store/offlineStore";
 import { useTheme } from "../theme/useTheme";
 
-// Carte de l'accueil agent : toujours visible, pour que l'agent sache ce qui reste
-// à envoyer. Le compteur est relu à chaque retour sur l'écran, car les dossiers et
-// photos mis en file pendant la saisie ne le mettent pas à jour eux-mêmes.
-export function SyncCard() {
+// Carte de l'écran d'arrivée des agents (AgentNewConsultationStart) : ouvre la
+// liste des dossiers à envoyer. Le compteur est relu à chaque retour sur l'écran.
+export function SyncCard({ onOpen }: { onOpen: () => void }) {
   const { colors, spacing, typography } = useTheme();
-  const { syncNow, syncing, isOnline, pendingCount } = useManualSync();
+  const pendingCount = useOfflineStore((s) => s.pendingCount);
 
   useFocusEffect(
     useCallback(() => {
@@ -20,19 +19,17 @@ export function SyncCard() {
     }, []),
   );
 
-  const status = !isOnline
-    ? "Hors ligne : connectez-vous à internet pour synchroniser."
-    : pendingCount > 0
-      ? `${pendingCount} élément${pendingCount > 1 ? "s" : ""} en attente d'envoi.`
-      : "Tout est envoyé.";
-
   return (
-    <Card style={{ marginBottom: spacing.md }}>
+    <Card style={{ marginBottom: spacing.xl }}>
       <Text style={[typography.label, { color: colors.accentStrong, letterSpacing: 0.6, marginBottom: spacing.sm }]}>
         SYNCHRONISATION
       </Text>
-      <Text style={[typography.bodyMuted, { color: colors.textMuted, marginBottom: spacing.md }]}>{status}</Text>
-      <Button label="Synchroniser maintenant" variant="secondary" onPress={syncNow} loading={syncing} disabled={!isOnline} />
+      <Text style={[typography.bodyMuted, { color: colors.textMuted, marginBottom: pendingCount > 0 ? spacing.md : 0 }]}>
+        {pendingCount > 0
+          ? `${pendingCount} dossier${pendingCount > 1 ? "s" : ""} à envoyer.`
+          : "Tous les dossiers sont envoyés."}
+      </Text>
+      {pendingCount > 0 ? <Button label="Voir les dossiers à envoyer" variant="secondary" onPress={onOpen} /> : null}
     </Card>
   );
 }

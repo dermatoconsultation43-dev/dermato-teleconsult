@@ -4,8 +4,10 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ScreenContainer } from "../../components/ScreenContainer";
 import { TextField } from "../../components/TextField";
 import { Card } from "../../components/Card";
+import { SyncCard } from "../../components/SyncCard";
 import { Icon } from "../../components/icons/Icon";
 import { useTheme } from "../../theme/useTheme";
+import { useAuthStore } from "../../store/authStore";
 import { useConsultationDraftStore } from "../../store/consultationDraftStore";
 import { signOut } from "../../services/auth/firebaseAuth";
 import type { AgentStackParamList } from "../../navigation/agentTypes";
@@ -24,6 +26,7 @@ type Props = NativeStackScreenProps<AgentStackParamList, "AgentNewConsultationSt
 // autres champs de Step1PersonalInfo restent à compléter normalement.
 export function AgentNewConsultationStart({ navigation }: Props) {
   const { colors, spacing, radius, typography } = useTheme();
+  const isAgent = useAuthStore((s) => s.admin?.role) === "agent";
   const resetDraft = useConsultationDraftStore((s) => s.reset);
   const setMode = useConsultationDraftStore((s) => s.setMode);
   const updateDraft = useConsultationDraftStore((s) => s.updateDraft);
@@ -76,6 +79,8 @@ export function AgentNewConsultationStart({ navigation }: Props) {
 
         <View style={{ width: 32 }} />
       </View>
+
+      {isAgent ? <SyncCard onOpen={() => navigation.navigate("AgentSync")} /> : null}
 
       <View style={{ alignItems: "center", marginBottom: spacing.xl }}>
         <View

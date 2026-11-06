@@ -5,5 +5,6 @@
 // n'a accès qu'à ces deux écrans, rien d'autre de l'espace admin.
 export type AgentStackParamList = {
   AgentNewConsultationStart: undefined;
+  AgentSync: undefined;
   AgentConsultation: undefined;
 };

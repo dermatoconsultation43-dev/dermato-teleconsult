@@ -4,17 +4,17 @@ import { recordWalkInConsent, saveWalkInDraft, submitWalkInConsultation, uploadW
 import { uploadPhoto } from "../api/photos";
 import { ApiError } from "../api/client";
 import { requeueInterruptedSyncs } from "./db";
-import { countPendingDrafts, getPendingDrafts, markDraftStatus, removeDraftLocally } from "./draftQueue";
+import { getPendingDrafts, markDraftStatus, removeDraftLocally } from "./draftQueue";
+import { countPendingDossiers } from "./pendingDossiers";
 import {
-  countPendingPhotos,
   getPendingPhotos,
+  getQueuedPhotosForClientUuid,
   markPhotoStatus,
   removePhotoLocally,
   setPhotoConsultationId,
   type PhotoQueueRow,
 } from "./photoQueue";
 import {
-  countPendingConsents,
   getPendingConsents,
   markConsentStatus,
   removeConsentLocally,
@@ -22,7 +22,6 @@ import {
   type ConsentQueueRow,
 } from "./consentQueue";
 import {
-  countPendingSubmits,
   getPendingSubmits,
   markSubmitStatus,
   removeSubmitLocally,
@@ -49,12 +48,9 @@ let syncingSubmits = false;
 const RETRY_INTERVAL_MS = 30000;
 
 export function refreshPendingCount(): void {
-  // Un seul compteur affiché (voir OfflineBanner) : la somme des quatre files —
-  // peu importe, du point de vue de l'utilisateur, que ce soit du texte, une
-  // photo, le consentement ou l'envoi final qui attend encore d'être envoyé.
-  useOfflineStore
-    .getState()
-    .setPendingCount(countPendingDrafts() + countPendingPhotos() + countPendingConsents() + countPendingSubmits());
+  // Compté en dossiers : peu importe, du point de vue de l'agent, que ce soit du
+  // texte, une photo, le consentement ou l'envoi final qui attend encore.
+  useOfflineStore.getState().setPendingCount(countPendingDossiers());
 }
 
 // À appeler une seule fois au démarrage de l'app (voir App.tsx). Écoute la
@@ -87,7 +83,7 @@ export function initSyncEngine(): void {
 
   setInterval(() => {
     const { isOnline, pendingCount } = useOfflineStore.getState();
-    if (isOnline && pendingCount > 0) {
+    if (isOnline && pendingCount > 0 && activeSyncs === 0) {
       void syncAll();
     }
   }, RETRY_INTERVAL_MS);
@@ -98,20 +94,42 @@ export function initSyncEngine(): void {
 // ce qui attendait un id serveur) ; l'envoi final en dernier, puisque le
 // serveur exige que les photos requises soient déjà reçues avant d'accepter un
 // dossier "soumis" — voir syncPendingSubmits.
-export async function syncAll(): Promise<void> {
-  await syncPendingDrafts();
-  await syncPendingConsents();
-  await syncPendingPhotos();
-  await syncPendingSubmits();
+async function syncQueues(only?: string): Promise<void> {
+  await syncPendingDrafts(only);
+  await syncPendingConsents(only);
+  await syncPendingPhotos(only);
+  await syncPendingSubmits(only);
+}
+
+// Les synchronisations passent l'une après l'autre : un appui sur un bouton pendant
+// un envoi automatique attend sa fin au lieu de ne rien faire.
+let syncChain: Promise<void> = Promise.resolve();
+let activeSyncs = 0;
+
+function enqueueSync(run: () => Promise<void>): Promise<void> {
+  activeSyncs++;
+  const next = syncChain.then(run).finally(() => {
+    activeSyncs--;
+  });
+  syncChain = next.catch(() => {});
+  return next;
+}
+
+export function syncAll(): Promise<void> {
+  return enqueueSync(() => syncQueues());
+}
+
+export function syncDossier(clientUuid: string): Promise<void> {
+  return enqueueSync(() => syncQueues(clientUuid));
 }
 
 // Exporté pour un bouton "Réessayer maintenant" côté UI, en plus du
 // déclenchement automatique au retour de connexion.
-export async function syncPendingDrafts(): Promise<void> {
+export async function syncPendingDrafts(only?: string): Promise<void> {
   if (syncingDrafts) return;
   syncingDrafts = true;
   try {
-    const pending = getPendingDrafts();
+    const pending = getPendingDrafts().filter((row) => !only || row.clientUuid === only);
     for (const row of pending) {
       useOfflineStore.getState().setDraftStatus(row.clientUuid, "syncing");
       markDraftStatus(row.clientUuid, "syncing");
@@ -165,11 +183,11 @@ async function replayQueuedConsent(row: ConsentQueueRow): Promise<void> {
 // ci-dessus. Rejoué juste après les brouillons : c'est leur succès qui fournit
 // l'id serveur nécessaire (voir setConsentConsultationId) à un consentement
 // donné pendant que le dossier était encore hors ligne.
-export async function syncPendingConsents(): Promise<void> {
+export async function syncPendingConsents(only?: string): Promise<void> {
   if (syncingConsents) return;
   syncingConsents = true;
   try {
-    const pending = getPendingConsents();
+    const pending = getPendingConsents().filter((row) => !only || row.clientUuid === only);
     for (const row of pending) {
       markConsentStatus(row.clientUuid, "syncing");
       try {
@@ -205,11 +223,11 @@ async function uploadQueuedPhoto(row: PhotoQueueRow): Promise<void> {
 
 // Exporté pour un bouton "Réessayer maintenant" côté UI, en plus du
 // déclenchement automatique au retour de connexion et après syncPendingDrafts.
-export async function syncPendingPhotos(): Promise<void> {
+export async function syncPendingPhotos(only?: string): Promise<void> {
   if (syncingPhotos) return;
   syncingPhotos = true;
   try {
-    const pending = getPendingPhotos();
+    const pending = getPendingPhotos().filter((row) => !only || row.clientUuid === only);
     for (const row of pending) {
       markPhotoStatus(row.id, "syncing");
       try {
@@ -244,19 +262,28 @@ async function replayQueuedSubmit(row: SubmitQueueRow): Promise<void> {
 // que les photos requises de ce dossier ne sont pas réellement reçues — une
 // ligne "failed" pour ce motif redevient "pending" au prochain passage et sera
 // retentée sans action de l'utilisateur, une fois les photos passées.
-export async function syncPendingSubmits(): Promise<void> {
+export async function syncPendingSubmits(only?: string): Promise<void> {
   if (syncingSubmits) return;
   syncingSubmits = true;
   try {
-    const pending = getPendingSubmits();
+    const pending = getPendingSubmits().filter((row) => !only || row.clientUuid === only);
     for (const row of pending) {
+      // Une fois le dossier soumis, le serveur refuse toute nouvelle photo : envoyer
+      // avant la dernière photo la laisserait bloquée pour toujours.
+      if (getQueuedPhotosForClientUuid(row.clientUuid).length > 0) continue;
       markSubmitStatus(row.clientUuid, "syncing");
       try {
         await replayQueuedSubmit(row);
         removeSubmitLocally(row.clientUuid);
       } catch (err) {
-        const message = err instanceof ApiError ? err.message : "Échec de l'envoi du dossier.";
-        markSubmitStatus(row.clientUuid, "failed", message);
+        // 409 : déjà soumis, par exemple quand la réponse d'un envoi précédent s'est
+        // perdue en route. Le dossier est bien arrivé, rien à retenter.
+        if (err instanceof ApiError && err.status === 409) {
+          removeSubmitLocally(row.clientUuid);
+        } else {
+          const message = err instanceof ApiError ? err.message : "Échec de l'envoi du dossier.";
+          markSubmitStatus(row.clientUuid, "failed", message);
+        }
       }
       refreshPendingCount();
     }

@@ -1,41 +1,29 @@
 import { useState } from "react";
-import { Alert } from "react-native";
-import { useQueryClient } from "@tanstack/react-query";
-import { refreshPendingCount, syncAll } from "../services/offline/syncEngine";
+import { syncAll, syncDossier } from "../services/offline/syncEngine";
 import { useOfflineStore } from "../store/offlineStore";
 
 // Synchronisation déclenchée à la main par l'agent, en plus de l'envoi automatique
-// (voir syncEngine.ts) : quand il sait qu'il a du réseau, il force l'envoi tout de
-// suite et voit le résultat, sans attendre le prochain passage automatique.
+// (voir syncEngine.ts). Le résultat se lit directement dans la liste des dossiers
+// (voir AgentSyncScreen) : un dossier envoyé en disparaît, un dossier refusé y
+// affiche sa raison.
 export function useManualSync() {
-  const queryClient = useQueryClient();
   const isOnline = useOfflineStore((s) => s.isOnline);
-  const pendingCount = useOfflineStore((s) => s.pendingCount);
-  const [syncing, setSyncing] = useState(false);
+  const [running, setRunning] = useState<string | "all" | null>(null);
 
-  async function syncNow() {
-    if (syncing) return;
-    if (!isOnline) {
-      Alert.alert("Pas de connexion", "Connectez-vous à internet, puis relancez la synchronisation.");
-      return;
-    }
-    setSyncing(true);
+  async function run(target: string | "all", sync: () => Promise<void>) {
+    if (running || !isOnline) return;
+    setRunning(target);
     try {
-      refreshPendingCount();
-      await syncAll();
-      refreshPendingCount();
-      await queryClient.invalidateQueries({ queryKey: ["admin"] });
+      await sync();
     } finally {
-      setSyncing(false);
+      setRunning(null);
     }
-    const remaining = useOfflineStore.getState().pendingCount;
-    Alert.alert(
-      remaining === 0 ? "Synchronisation terminée" : "Synchronisation incomplète",
-      remaining === 0
-        ? "Tous les dossiers ont été envoyés."
-        : `${remaining} élément${remaining > 1 ? "s" : ""} encore en attente d'envoi. Vérifiez la connexion et réessayez.`,
-    );
   }
 
-  return { syncNow, syncing, isOnline, pendingCount };
+  return {
+    isOnline,
+    running,
+    syncOne: (clientUuid: string) => run(clientUuid, () => syncDossier(clientUuid)),
+    syncEverything: () => run("all", syncAll),
+  };
 }

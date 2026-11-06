@@ -85,6 +85,15 @@ export function getDb(): string {
         updated_at TEXT NOT NULL
       );`,
     );
+    // Code du patient de chaque dossier, pour la liste des dossiers à envoyer (voir
+    // pendingDossiers.ts#rememberDossierLabel).
+    QuickSQLite.execute(
+      DB_NAME,
+      `CREATE TABLE IF NOT EXISTS dossier_labels (
+        client_uuid TEXT PRIMARY KEY,
+        label TEXT NOT NULL
+      );`,
+    );
     // Dernier profil résolu (patient ou admin/agent) par compte Firebase — voir
     // profileCache.ts : permet d'ouvrir l'app sans réseau au lieu de rester bloqué
     // sur "Impossible de joindre le serveur" (RootNavigator#resolveProfile).

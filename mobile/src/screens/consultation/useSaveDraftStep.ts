@@ -5,7 +5,9 @@ import { ApiError } from "../../services/api/client";
 import { useConsultationDraftStore } from "../../store/consultationDraftStore";
 import { useOfflineStore } from "../../store/offlineStore";
 import { useIsDevPreview } from "../../hooks/useIsDevPreview";
-import { countPendingDrafts, saveDraftLocally } from "../../services/offline/draftQueue";
+import { saveDraftLocally } from "../../services/offline/draftQueue";
+import { rememberDossierLabel } from "../../services/offline/pendingDossiers";
+import { refreshPendingCount } from "../../services/offline/syncEngine";
 import { useSummaryReturn } from "./useSummaryReturn";
 
 // Traduit les noms de champs du schéma backend (voir consultations.schemas.ts)
@@ -77,7 +79,6 @@ export function useSaveDraftStep() {
   const draft = useConsultationDraftStore((s) => s.draft);
   const setConsultationMeta = useConsultationDraftStore((s) => s.setConsultationMeta);
   const setDraftStatus = useOfflineStore((s) => s.setDraftStatus);
-  const setPendingCount = useOfflineStore((s) => s.setPendingCount);
   const isDevPreview = useIsDevPreview();
   const { fromSummary, returnToSummary } = useSummaryReturn();
   const [saving, setSaving] = useState(false);
@@ -92,6 +93,7 @@ export function useSaveDraftStep() {
       onSuccess();
       return;
     }
+    rememberDossierLabel(clientUuid, draft.nomComplet);
     setSaving(true);
     setError(null);
     try {
@@ -103,7 +105,7 @@ export function useSaveDraftStep() {
       if (err instanceof ApiError && err.status === 0) {
         saveDraftLocally(clientUuid, draft, mode);
         setDraftStatus(clientUuid, "pending");
-        setPendingCount(countPendingDrafts());
+        refreshPendingCount();
         onSuccess();
       } else if (err instanceof ApiError) {
         setError(formatValidationDetails(err.details) ?? err.message);

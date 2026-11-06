@@ -4,6 +4,8 @@ import type { DraftSyncStatus } from "../services/offline/draftQueue";
 interface OfflineState {
   isOnline: boolean;
   pendingCount: number;
+  /** Change à chaque relecture des files, pour rafraîchir la liste des dossiers. */
+  queueRevision: number;
   draftStatuses: Record<string, { status: DraftSyncStatus; error?: string }>;
   setOnline: (online: boolean) => void;
   setPendingCount: (count: number) => void;
@@ -16,9 +18,10 @@ interface OfflineState {
 export const useOfflineStore = create<OfflineState>((set) => ({
   isOnline: true,
   pendingCount: 0,
+  queueRevision: 0,
   draftStatuses: {},
   setOnline: (online) => set({ isOnline: online }),
-  setPendingCount: (count) => set({ pendingCount: count }),
+  setPendingCount: (count) => set((state) => ({ pendingCount: count, queueRevision: state.queueRevision + 1 })),
   setDraftStatus: (clientUuid, status, error) =>
     set((state) => ({ draftStatuses: { ...state.draftStatuses, [clientUuid]: { status, error } } })),
 }));
