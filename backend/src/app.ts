@@ -15,6 +15,7 @@ import { availabilitiesRouter } from "./modules/availabilities/availabilities.ro
 import { lesionTypesRouter } from "./modules/lesionTypes/lesionTypes.routes.js";
 import { adminRouter } from "./modules/admin/admin.routes.js";
 import { agentConsultationsRouter } from "./modules/agent/agent.routes.js";
+import { scheduleConsultationsExport } from "./services/excelExport.js";
 
 export function createApp() {
   const app = express();
@@ -43,6 +44,18 @@ export function createApp() {
   app.use("/api/v1/health", healthRouter);
 
   app.use("/api/v1", apiRateLimiter);
+  // Toute écriture réussie (soumission, correction admin, statut, conclusion,
+  // suppression...) programme une mise à jour de l'export Excel dans Drive (voir
+  // services/excelExport.ts, qui regroupe les changements rapprochés) — un seul
+  // point d'accroche plutôt qu'un appel à ne pas oublier dans chaque service.
+  app.use("/api/v1", (req, res, next) => {
+    if (req.method !== "GET") {
+      res.on("finish", () => {
+        if (res.statusCode < 400) scheduleConsultationsExport();
+      });
+    }
+    next();
+  });
   app.use("/api/v1/patients", patientsRouter);
   app.use("/api/v1/consultations", consultationsRouter);
   app.use("/api/v1/consultations/:consultationId/photos", photosRouter);

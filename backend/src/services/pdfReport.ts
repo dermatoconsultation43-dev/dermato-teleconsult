@@ -35,23 +35,40 @@ const PHOTO_SLOT_LABELS: Record<string, string> = {
   vue_rapprochee: "Vue rapprochée",
   complementaire: "Photo complémentaire",
 };
-const BODY_ZONE_LABELS: Record<string, string> = {
+// Miroir de mobile/src/components/BodyMap.tsx#BODY_ZONE_LABELS (codes "_arriere"
+// = vue de dos). Exporté pour l'export Excel (services/excelExport.ts).
+export const BODY_ZONE_LABELS: Record<string, string> = {
   tete: "Tête / visage",
-  cou: "Cou",
-  torse: "Torse (avant)",
+  cou: "Cou (avant)",
+  torse: "Torse / ventre",
+  bras_droit: "Bras droit (avant)",
+  bras_gauche: "Bras gauche (avant)",
+  avant_bras_droit: "Avant-bras droit (avant)",
+  avant_bras_gauche: "Avant-bras gauche (avant)",
+  main_droite: "Main droite (paume)",
+  main_gauche: "Main gauche (paume)",
+  cuisse_droite: "Cuisse droite (avant)",
+  cuisse_gauche: "Cuisse gauche (avant)",
+  jambe_droite: "Jambe droite (avant)",
+  jambe_gauche: "Jambe gauche (avant)",
+  pied_droit: "Pied droit (dessus)",
+  pied_gauche: "Pied gauche (dessus)",
+
+  tete_arriere: "Arrière de la tête / cuir chevelu",
+  nuque: "Nuque",
   dos: "Dos",
-  bras_droit: "Bras droit (haut)",
-  bras_gauche: "Bras gauche (haut)",
-  avant_bras_droit: "Avant-bras droit",
-  avant_bras_gauche: "Avant-bras gauche",
-  main_droite: "Main droite",
-  main_gauche: "Main gauche",
-  cuisse_droite: "Cuisse droite",
-  cuisse_gauche: "Cuisse gauche",
-  jambe_droite: "Jambe droite (bas)",
-  jambe_gauche: "Jambe gauche (bas)",
-  pied_droit: "Pied droit",
-  pied_gauche: "Pied gauche",
+  bras_droit_arriere: "Bras droit (arrière)",
+  bras_gauche_arriere: "Bras gauche (arrière)",
+  avant_bras_droit_arriere: "Avant-bras droit (arrière)",
+  avant_bras_gauche_arriere: "Avant-bras gauche (arrière)",
+  main_droite_arriere: "Main droite (dos de la main)",
+  main_gauche_arriere: "Main gauche (dos de la main)",
+  cuisse_droite_arriere: "Cuisse droite (arrière)",
+  cuisse_gauche_arriere: "Cuisse gauche (arrière)",
+  jambe_droite_arriere: "Mollet droit",
+  jambe_gauche_arriere: "Mollet gauche",
+  pied_droit_arriere: "Talon / pied droit (arrière)",
+  pied_gauche_arriere: "Talon / pied gauche (arrière)",
 };
 
 // pdfkit n'intègre nativement que JPEG/PNG — HEIC/WEBP (autorisés à l'envoi,
@@ -183,6 +200,7 @@ export async function generateConsultationReportPdf(
   row("Aspects sélectionnés", aspects || "—");
   const zones = consultation.lesionZones.map((z) => BODY_ZONE_LABELS[z] ?? z).join(", ");
   row("Zones du corps touchées", zones || "—");
+  if (consultation.autresLesionsLocalisation) row("Autres localisations", consultation.autresLesionsLocalisation);
 
   section("Autres lésions et zones sensibles");
   row("Autres lésions ailleurs", oui(consultation.autresLesions));

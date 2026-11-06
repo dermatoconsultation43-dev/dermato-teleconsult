@@ -3,3 +3,7 @@
 
 node_modules/
 .DS_Store
+
+# Sauvegardes du fichier .env
+*.env.bak*
+.env.bak*

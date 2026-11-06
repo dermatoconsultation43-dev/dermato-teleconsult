@@ -127,6 +127,17 @@ export function Step3LesionAspect({ navigation }: Props) {
       </Text>
       <BodyMap selected={draft.lesionZones ?? []} onChange={(zones) => updateDraft({ lesionZones: zones })} />
 
+      {/* Stocké dans autresLesionsLocalisation : champ texte resté en base après le
+          passage à la carte du corps (voir schema.prisma), réutilisé ici pour ce que
+          le schéma ne permet pas de pointer. */}
+      <TextField
+        label="Autres localisations (précisez)"
+        placeholder="Ex. : cuir chevelu, ongles, plis (aisselles, aine), sous les seins..."
+        value={draft.autresLesionsLocalisation ?? ""}
+        onChangeText={(v) => updateDraft({ autresLesionsLocalisation: v })}
+        style={{ marginTop: spacing.xl }}
+      />
+
       <TextField
         label="Où les lésions sont-elles apparues en premier ?"
         value={draft.localisationPremieresLesions ?? ""}

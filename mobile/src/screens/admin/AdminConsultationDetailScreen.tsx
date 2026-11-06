@@ -491,6 +491,7 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
           label="Zones du corps touchées"
           value={consultation.lesionZones?.length ? consultation.lesionZones.map((z) => BODY_ZONE_LABELS[z] ?? z).join(", ") : undefined}
         />
+        <InfoRow label="Autres localisations" value={consultation.autresLesionsLocalisation} />
         <InfoRow label="Démangeaisons" value={consultation.demangeaison ? DEMANGEAISON_LABELS[consultation.demangeaison] : undefined} />
         <InfoRow
           label="Aspect des lésions"
@@ -505,7 +506,7 @@ export function AdminConsultationDetailScreen({ route, navigation }: Props) {
         {consultation.autresLesions ? (
           <InfoRow
             label="Autres lésions"
-            value={[consultation.autresLesionsAspect, consultation.autresLesionsLocalisation].filter(Boolean).join(" — ") || "Oui"}
+            value={consultation.autresLesionsAspect || "Oui"}
           />
         ) : null}
         {consultation.zonesSensiblesAtteintes ? (

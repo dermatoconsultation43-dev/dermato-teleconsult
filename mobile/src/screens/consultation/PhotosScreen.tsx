@@ -20,10 +20,27 @@ import type { PhotoSlot } from "../../types/api";
 
 type Props = NativeStackScreenProps<ConsultationStackParamList, "Photos">;
 
-const SLOTS: Array<{ slot: PhotoSlot; title: string }> = [
-  { slot: "vue_generale", title: "Vue générale" },
-  { slot: "vue_rapprochee", title: "Vue rapprochée" },
-  { slot: "complementaire", title: "Photo supplémentaire" },
+// Nombre de photos par emplacement : une seule vue de loin et une seule vue de près,
+// jusqu'à 3 photos supplémentaires (autres zones atteintes, autre angle...).
+const SLOTS: Array<{ slot: PhotoSlot; title: string; hint: string; max: number }> = [
+  {
+    slot: "vue_generale",
+    title: "Photo de loin (vue générale)",
+    hint: "À environ 1 mètre : on doit voir toute la zone atteinte et reconnaître la partie du corps (ex. tout le bras, tout le dos, tout le visage).",
+    max: 1,
+  },
+  {
+    slot: "vue_rapprochee",
+    title: "Photo de près (vue rapprochée)",
+    hint: "À environ 10–15 cm : la lésion remplit l'image et reste nette (on doit voir les détails : relief, couleur, bords, croûtes...).",
+    max: 1,
+  },
+  {
+    slot: "complementaire",
+    title: "Photos supplémentaires (jusqu'à 3)",
+    hint: "Autres zones atteintes, autre angle, ou autres lésions d'aspect différent.",
+    max: 3,
+  },
 ];
 
 const TIPS = [
@@ -177,11 +194,13 @@ export function PhotosScreen({ navigation }: Props) {
         ))}
       </Card>
 
-      {SLOTS.map(({ slot, title }) => {
+      {SLOTS.map(({ slot, title, hint, max }) => {
         const slotPhotos = renderSlotPhotos(slot);
+        const keptCount = slotPhotos.filter((p) => p.status !== "error").length;
         return (
           <View key={slot} style={{ marginBottom: spacing.xxl }}>
-            <Text style={[typography.label, { color: colors.text, marginBottom: spacing.sm }]}>{title}</Text>
+            <Text style={[typography.label, { color: colors.text, marginBottom: spacing.xs }]}>{title}</Text>
+            <Text style={[typography.caption, { color: colors.textMuted, marginBottom: spacing.sm }]}>{hint}</Text>
 
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: spacing.sm, marginBottom: spacing.sm }}>
               {slotPhotos.map((photo) => (
@@ -223,9 +242,7 @@ export function PhotosScreen({ navigation }: Props) {
               ))}
             </View>
 
-            {slot === "complementaire" ||
-            slotPhotos.length === 0 ||
-            slotPhotos.every((p) => p.status === "error") ? (
+            {keptCount < max ? (
               <View style={{ flexDirection: "row", gap: spacing.sm }}>
                 <Button label="Prendre une photo" variant="secondary" fullWidth={false} onPress={() => pickAndUpload(slot, "camera")} />
                 <Button

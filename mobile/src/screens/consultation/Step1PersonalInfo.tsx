@@ -16,20 +16,20 @@ type Props = NativeStackScreenProps<ConsultationStackParamList, "Step1PersonalIn
 // seulement une fois la saisie complète, pour ne pas gêner la frappe.
 const FR_DATE_RE = /^(\d{2})\/(\d{2})\/(\d{4})$/;
 
-function frDateToIso(text: string): string | undefined {
+export function frDateToIso(text: string): string | undefined {
   const match = FR_DATE_RE.exec(text.trim());
   if (!match) return undefined;
   const [, day, month, year] = match;
   return `${year}-${month}-${day}`;
 }
 
-function isoDateToFr(iso: string | undefined): string {
+export function isoDateToFr(iso: string | undefined): string {
   if (!iso) return "";
   const [year, month, day] = iso.split("-");
   return day && month && year ? `${day}/${month}/${year}` : "";
 }
 
-const STATUT_OPTIONS = [
+export const STATUT_OPTIONS = [
   { value: "celibataire", label: "Célibataire" },
   { value: "marie", label: "Marié(e)" },
   { value: "vie_en_couple", label: "Vie en couple" },
@@ -50,13 +50,20 @@ export function Step1PersonalInfo({ navigation }: Props) {
     updateDraft({ dateNaissance: frDateToIso(text) });
   }
 
+  // Téléphone facultatif (beaucoup de personnes vues sur le terrain n'en ont pas) :
+  // la question WhatsApp n'a de sens, et n'est donc requise, que si un numéro est saisi.
+  const hasPhone = Boolean(draft.telephoneContact?.trim());
   const canContinue = Boolean(
-    draft.nomComplet && draft.sexe && draft.age && draft.telephoneContact && draft.confirmationWhatsapp !== undefined,
+    draft.nomComplet && draft.sexe && draft.age && (!hasPhone || draft.confirmationWhatsapp !== undefined),
   );
 
   function handleContinue() {
-    if (!draft.nomComplet || !draft.sexe || !draft.age || !draft.telephoneContact || draft.confirmationWhatsapp === undefined) {
-      setLocalError("Nom complet, sexe, âge, numéro de téléphone et confirmation par WhatsApp sont requis.");
+    if (!draft.nomComplet || !draft.sexe || !draft.age || (hasPhone && draft.confirmationWhatsapp === undefined)) {
+      setLocalError(
+        hasPhone
+          ? "Nom complet, sexe, âge et confirmation par WhatsApp sont requis."
+          : "Nom complet, sexe et âge sont requis.",
+      );
       return;
     }
     setLocalError(null);
@@ -116,9 +123,13 @@ export function Step1PersonalInfo({ navigation }: Props) {
       <TextField label="Ville de résidence" value={draft.ville ?? ""} onChangeText={(v) => updateDraft({ ville: v })} />
       <TextField label="Profession" value={draft.profession ?? ""} onChangeText={(v) => updateDraft({ profession: v })} />
       <TextField
-        label="Numéro de téléphone *"
+        label="Numéro de téléphone (facultatif)"
         value={draft.telephoneContact ?? ""}
-        onChangeText={(v) => updateDraft({ telephoneContact: v })}
+        // Vidé → undefined (pas ""), sinon le backend refuse le brouillon
+        // (telephoneContact doit faire au moins 1 caractère s'il est envoyé).
+        onChangeText={(v) =>
+          updateDraft(v.trim() ? { telephoneContact: v } : { telephoneContact: undefined, confirmationWhatsapp: undefined })
+        }
         keyboardType="phone-pad"
       />
       <TextField
@@ -129,17 +140,21 @@ export function Step1PersonalInfo({ navigation }: Props) {
         autoCapitalize="none"
       />
 
-      <Text style={[typography.label, { color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }]}>
-        Confirmation par WhatsApp *
-      </Text>
-      <ChoiceGroup
-        options={[
-          { value: "oui", label: "Oui" },
-          { value: "non", label: "Non" },
-        ]}
-        selected={draft.confirmationWhatsapp === undefined ? [] : [draft.confirmationWhatsapp ? "oui" : "non"]}
-        onChange={([value]) => updateDraft({ confirmationWhatsapp: value === "oui" })}
-      />
+      {hasPhone ? (
+        <>
+          <Text style={[typography.label, { color: colors.text, marginTop: spacing.xl, marginBottom: spacing.sm }]}>
+            Confirmation par WhatsApp *
+          </Text>
+          <ChoiceGroup
+            options={[
+              { value: "oui", label: "Oui" },
+              { value: "non", label: "Non" },
+            ]}
+            selected={draft.confirmationWhatsapp === undefined ? [] : [draft.confirmationWhatsapp ? "oui" : "non"]}
+            onChange={([value]) => updateDraft({ confirmationWhatsapp: value === "oui" })}
+          />
+        </>
+      ) : null}
 
       <TextField
         label="Poids (kg)"

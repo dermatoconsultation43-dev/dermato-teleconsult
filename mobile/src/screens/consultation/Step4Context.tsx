@@ -20,7 +20,10 @@ const ENTOURAGE_OPTIONS = [
 
 // Regroupe entourage + produits utilisés + antécédents médicaux : trois questions
 // de contexte, indépendantes les unes des autres, qui n'ont pas besoin d'écrans
-// séparés (voir demande de consolidation 13 -> 6 étapes).
+// séparés (voir demande de consolidation 13 -> 6 étapes). Entourage et antécédents
+// sont des questions fermées, sans champ "Précisez", et le champ libre "Autres
+// informations" a été retiré (demande client) — les colonnes restent en base pour
+// les dossiers déjà saisis.
 export function Step4Context({ navigation }: Props) {
   const { colors, spacing, typography } = useTheme();
   const draft = useConsultationDraftStore((s) => s.draft);
@@ -48,14 +51,6 @@ export function Step4Context({ navigation }: Props) {
         selected={draft.entourageStatus ? [draft.entourageStatus] : []}
         onChange={([value]) => updateDraft({ entourageStatus: value as typeof draft.entourageStatus })}
       />
-      {draft.entourageStatus === "oui" ? (
-        <TextField
-          label="Précisez"
-          value={draft.entouragePrecision ?? ""}
-          onChangeText={(v) => updateDraft({ entouragePrecision: v })}
-          style={{ marginTop: spacing.lg }}
-        />
-      ) : null}
 
       <Text style={[typography.h2, { color: colors.text, marginTop: spacing.xxl, marginBottom: spacing.sm }]}>
         Produits et traitements utilisés
@@ -83,23 +78,6 @@ export function Step4Context({ navigation }: Props) {
         médicaments ?
       </Text>
       <YesNoToggle value={draft.antecedentsMedicaux} onChange={(value) => updateDraft({ antecedentsMedicaux: value })} />
-      {draft.antecedentsMedicaux ? (
-        <TextField
-          label="Précisez"
-          value={draft.antecedentsPrecision ?? ""}
-          onChangeText={(v) => updateDraft({ antecedentsPrecision: v })}
-          style={{ marginTop: spacing.lg }}
-        />
-      ) : null}
-
-      <TextField
-        label="Autres informations que vous jugez importantes concernant votre problème"
-        value={draft.notesComplementaires ?? ""}
-        onChangeText={(v) => updateDraft({ notesComplementaires: v })}
-        multiline
-        numberOfLines={4}
-        style={{ minHeight: 100, textAlignVertical: "top", marginTop: spacing.lg }}
-      />
     </StepScreen>
   );
 }

@@ -177,8 +177,9 @@ const REQUIRED_DRAFT_FIELDS: Array<{ field: keyof ConsultationDraftInput; label:
   { field: "nomComplet", label: "Nom complet" },
   { field: "sexe", label: "Sexe" },
   { field: "age", label: "Âge" },
-  { field: "telephoneContact", label: "Numéro de téléphone" },
-  { field: "confirmationWhatsapp", label: "Confirmation par WhatsApp" },
+  // Téléphone facultatif : beaucoup de personnes vues sur le terrain n'en ont pas.
+  // La confirmation WhatsApp n'est donc exigée que si un numéro est renseigné
+  // (voir submitConsultation).
   { field: "motif", label: "Motif de consultation" },
   { field: "demangeaison", label: "Démangeaisons" },
 ];
@@ -201,6 +202,9 @@ export async function submitConsultation(patientId: string, id: string) {
     const value = consultation[field as keyof typeof consultation];
     return value === null || value === undefined || value === "";
   });
+  if (consultation.telephoneContact && consultation.confirmationWhatsapp === null) {
+    missing.push({ field: "confirmationWhatsapp", label: "Confirmation par WhatsApp" });
+  }
   if (missing.length > 0) {
     throw new ValidationError(
       `Champs requis manquants avant l'envoi : ${missing.map((m) => m.label).join(", ")}`,

@@ -168,6 +168,7 @@ export function SummaryScreen({ navigation }: Props) {
           label="Zones du corps"
           value={draft.lesionZones?.length ? draft.lesionZones.map((z) => BODY_ZONE_LABELS[z] ?? z).join(", ") : undefined}
         />
+        <Field label="Autres localisations" value={draft.autresLesionsLocalisation} />
       </Section>
 
       <Section title="Contexte" onEdit={() => navigation.navigate("Step4Context")}>

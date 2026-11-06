@@ -29,6 +29,10 @@ const envSchema = z.object({
   // rapports patient, pour que le dermatologue retrouve ses propres comptes-rendus
   // sans les noyer dans les pièces jointes brutes des patients.
   GOOGLE_DRIVE_RESPONSES_FOLDER_ID: z.string().min(1, "GOOGLE_DRIVE_RESPONSES_FOLDER_ID est requis"),
+  // Dossier Drive de l'export Excel de tous les dossiers (voir services/
+  // excelExport.ts). Optionnel : à défaut, le fichier est déposé avec les PDF de
+  // conclusion, dans GOOGLE_DRIVE_RESPONSES_FOLDER_ID.
+  GOOGLE_DRIVE_EXPORT_FOLDER_ID: z.string().min(1).optional(),
 
   RATE_LIMIT_WINDOW_MINUTES: z.coerce.number().int().positive().default(15),
   RATE_LIMIT_MAX_REQUESTS: z.coerce.number().int().positive().default(300),
