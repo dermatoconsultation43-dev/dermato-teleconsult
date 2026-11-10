@@ -37,7 +37,10 @@ export async function uploadPhoto(
   }
 
   const photoId = randomUUID();
-  const fileName = buildPhotoFileName(consultationId, photoId, input.mimeType);
+  // Compte aussi les photos supprimées : un numéro n'est jamais réutilisé, donc
+  // deux fichiers d'un même dossier ne portent jamais le même nom dans Drive.
+  const photoNumber = (await prisma.photo.count({ where: { consultationId } })) + 1;
+  const fileName = buildPhotoFileName(consultation, photoNumber, input.mimeType);
   const { fileId } = await uploadPhotoToDrive(input.buffer, fileName, input.mimeType);
 
   return prisma.photo.create({

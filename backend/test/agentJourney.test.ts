@@ -65,6 +65,16 @@ describe("Parcours agent terrain", () => {
       expect(uploadResponse.status).toBe(201);
     }
 
+    // Les photos portent le même début que le PDF du dossier (n° + code patient),
+    // pour être reconnaissables dans le sous-dossier Drive "Photos". Le faux id
+    // Drive renvoyé par test/mocks.ts se termine par le nom de fichier envoyé.
+    const ref = String(stored.refNumber).padStart(6, "0");
+    const uploadedPhotos = await prisma.photo.findMany({ where: { consultationId }, orderBy: { createdAt: "asc" } });
+    expect(uploadedPhotos.map((photo) => photo.driveFileId.replace(/^fake-drive-file-\d+-/, ""))).toEqual([
+      `${ref} - Kouadio Marie - photo 1.jpg`,
+      `${ref} - Kouadio Marie - photo 2.jpg`,
+    ]);
+
     const consentResponse = await request(app)
       .post(`/api/v1/admin/agent-consultations/${consultationId}/consent`)
       .set("Authorization", agent.authHeader)

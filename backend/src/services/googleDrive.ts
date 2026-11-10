@@ -16,9 +16,73 @@ export const ALLOWED_PHOTO_MIME_TYPES: Record<string, string> = {
 
 export const MAX_PHOTO_SIZE_BYTES = 25 * 1024 * 1024; // 25 Mo — voir services/storage.ts (valeur reprise à l'identique).
 
-export function buildPhotoFileName(consultationId: string, photoId: string, mimeType: string): string {
+// Même début que le PDF du dossier (voir pdfReport.ts#buildReportFileName) : triées
+// par nom dans Drive, les photos se regroupent par dossier et une recherche
+// "000083" retrouve à la fois le PDF et ses photos.
+export function buildPhotoFileName(
+  consultation: { refNumber: number; nomComplet: string | null },
+  photoNumber: number,
+  mimeType: string,
+): string {
   const extension = ALLOWED_PHOTO_MIME_TYPES[mimeType] ?? "bin";
-  return `${consultationId}_${photoId}.${extension}`;
+  const ref = String(consultation.refNumber).padStart(6, "0");
+  const nom = sanitizeFileNamePart(consultation.nomComplet?.trim() || "Sans nom", 40);
+  return `${ref} - ${nom} - photo ${photoNumber}.${extension}`;
+}
+
+// Filtre les caractères interdits/gênants dans un nom de fichier (Drive comme
+// Windows) et plafonne la longueur — un motif de consultation ou un code patient
+// est un champ libre, potentiellement long ou farci de ponctuation. Partagé avec
+// pdfReport.ts pour que les PDF et les photos d'un dossier portent le même début.
+export function sanitizeFileNamePart(text: string, maxLength: number): string {
+  const cleaned = text
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[/\\:*?"<>|]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength).trim()}…` : cleaned;
+}
+
+// Les photos brutes vont dans un sous-dossier, pour que le dossier principal ne
+// montre que les PDF récapitulatifs (qui contiennent déjà les photos). Elles
+// restent indispensables : l'écran admin et la génération du PDF les relisent
+// depuis Drive par leur id (voir streamPhotoFromDrive, pdfReport.ts).
+export const PHOTOS_SUBFOLDER_NAME = "Photos";
+const FOLDER_MIME_TYPE = "application/vnd.google-apps.folder";
+
+// Mémorisé pour ne pas relister Drive à chaque photo ; oublié en cas d'échec pour
+// retenter à la photo suivante plutôt que de rester bloqué sur une erreur passagère.
+let photosSubfolderId: Promise<string> | null = null;
+
+export function getPhotosSubfolderId(): Promise<string> {
+  if (!photosSubfolderId) {
+    photosSubfolderId = findOrCreatePhotosSubfolder().catch((error) => {
+      photosSubfolderId = null;
+      throw error;
+    });
+  }
+  return photosSubfolderId;
+}
+
+async function findOrCreatePhotosSubfolder(): Promise<string> {
+  const parentId = env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID;
+  const existing = await drive.files.list({
+    q: `name = '${PHOTOS_SUBFOLDER_NAME}' and mimeType = '${FOLDER_MIME_TYPE}' and '${parentId}' in parents and trashed = false`,
+    fields: "files(id)",
+    pageSize: 1,
+  });
+  const existingId = existing.data.files?.[0]?.id;
+  if (existingId) return existingId;
+
+  const created = await drive.files.create({
+    requestBody: { name: PHOTOS_SUBFOLDER_NAME, mimeType: FOLDER_MIME_TYPE, parents: [parentId] },
+    fields: "id",
+  });
+  if (!created.data.id) {
+    throw new Error("Google Drive n'a pas renvoyé d'id après la création du sous-dossier Photos.");
+  }
+  return created.data.id;
 }
 
 export async function uploadPhotoToDrive(
@@ -27,7 +91,7 @@ export async function uploadPhotoToDrive(
   mimeType: string,
 ): Promise<{ fileId: string; webViewLink: string }> {
   const response = await drive.files.create({
-    requestBody: { name: fileName, parents: [env.GOOGLE_DRIVE_PHOTOS_FOLDER_ID] },
+    requestBody: { name: fileName, parents: [await getPhotosSubfolderId()] },
     media: { mimeType, body: Readable.from(buffer) },
     fields: "id, webViewLink",
   });

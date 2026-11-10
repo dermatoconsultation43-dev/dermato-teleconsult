@@ -1,7 +1,7 @@
 import PDFDocument from "pdfkit";
 import { drive } from "./googleAuth.js";
 import { env } from "../config/env.js";
-import { deleteDriveFile } from "./googleDrive.js";
+import { deleteDriveFile, sanitizeFileNamePart } from "./googleDrive.js";
 import { logger } from "../lib/logger.js";
 import type { Prisma } from "@prisma/client";
 
@@ -83,19 +83,6 @@ function oui(value: boolean | null | undefined): string {
 
 function val(value: string | number | null | undefined): string {
   return value === null || value === undefined || value === "" ? "—" : String(value);
-}
-
-// Filtre les caractères interdits/gênants dans un nom de fichier (Drive comme
-// Windows) et plafonne la longueur — un motif de consultation est un champ
-// libre, potentiellement long ou farci de ponctuation.
-function sanitizeFileNamePart(text: string, maxLength: number): string {
-  const cleaned = text
-    .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/[/\\:*?"<>|]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return cleaned.length > maxLength ? `${cleaned.slice(0, maxLength).trim()}…` : cleaned;
 }
 
 export function buildReportFileName(consultation: { refNumber: number; nomComplet: string | null; motif: string | null }): string {
