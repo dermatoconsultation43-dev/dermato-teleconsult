@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, Alert, Image, Text, View, type ImageSourcePropType } from "react-native";
+import { ActivityIndicator, Alert, Image, Pressable, Text, View, type ImageSourcePropType } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { ScreenContainer } from "../../components/ScreenContainer";
@@ -8,6 +8,7 @@ import { Button } from "../../components/Button";
 import { TextField } from "../../components/TextField";
 import { ChoiceGroup } from "../../components/ChoiceGroup";
 import { StatusBadge } from "../../components/StatusBadge";
+import { ZoomableImageModal } from "../../components/ZoomableImageModal";
 import { BODY_ZONE_LABELS } from "../../components/BodyMap";
 import { useTheme } from "../../theme/useTheme";
 import { useAuthStore } from "../../store/authStore";
@@ -119,6 +120,12 @@ function PhotoRow({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
+
+  // Photo affichée en vignette, touchable pour l'ouvrir en plein écran : le
+  // dermatologue doit pouvoir agrandir une lésion pour en voir les détails.
+  const shownSource: ImageSourcePropType | null =
+    revealed && mockSource ? mockSource : source && !imageError ? { uri: source } : null;
 
   async function reveal() {
     if (mockSource) {
@@ -143,19 +150,30 @@ function PhotoRow({
       <Text style={[typography.label, { color: colors.text, marginBottom: spacing.sm }]}>
         {PHOTO_SLOT_LABELS[photo.slot]}
       </Text>
-      {revealed && mockSource ? (
-        <Image
-          source={mockSource}
-          style={{ width: "100%", height: 240, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
-          resizeMode="cover"
-        />
-      ) : source && !imageError ? (
-        <Image
-          source={{ uri: source }}
-          style={{ width: "100%", height: 240, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
-          resizeMode="cover"
-          onError={() => setImageError(true)}
-        />
+      {shownSource ? (
+        <>
+          <Pressable
+            onPress={() => setZoomed(true)}
+            accessibilityRole="imagebutton"
+            accessibilityLabel={`Agrandir la photo : ${PHOTO_SLOT_LABELS[photo.slot]}`}
+          >
+            <Image
+              source={shownSource}
+              style={{ width: "100%", height: 240, borderRadius: radius.md, backgroundColor: colors.surfaceAlt }}
+              resizeMode="cover"
+              onError={() => setImageError(true)}
+            />
+          </Pressable>
+          <Text style={[typography.caption, { color: colors.textMuted, marginTop: spacing.xs }]}>
+            Touchez la photo pour l'agrandir.
+          </Text>
+          <ZoomableImageModal
+            visible={zoomed}
+            source={shownSource}
+            title={PHOTO_SLOT_LABELS[photo.slot]}
+            onClose={() => setZoomed(false)}
+          />
+        </>
       ) : imageError ? (
         <View>
           <Text style={[typography.caption, { color: colors.danger, marginBottom: spacing.xs }]}>
